@@ -1,12 +1,11 @@
-import { StyleSheet } from "react-native";
-import { View } from "../../components/Themed";
+import { StyleSheet, SafeAreaView } from "react-native";
 import BookList from "../../components/BookList";
 
-export default function HomeScreen() {
+export default function Index() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <BookList />
-    </View>
+    </SafeAreaView>
   );
 }
 
