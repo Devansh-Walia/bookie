@@ -13,7 +13,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import useBookStore from "../store/bookStore";
 import { Book } from "../types";
-import PDFViewer from "./PDFViewer";
+import PDFViewer from "./PDF/PDFViewer";
 
 export default function BookList() {
   const { books, addBook, removeBook } = useBookStore();
