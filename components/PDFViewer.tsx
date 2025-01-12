@@ -125,15 +125,22 @@ export default function PDFViewer({
                     transform-style: preserve-3d;
                     background: #1a2634;
                   }
-                  #pageContainer {
-                    position: relative;
+                  .page-wrapper {
+                    position: absolute;
                     width: 100%;
                     height: 100%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
                     transform-style: preserve-3d;
+                  }
+                  #currentPage {
+                    z-index: 2;
                     transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1);
+                  }
+                  #nextPage {
+                    z-index: 1;
+                    opacity: 0.999;
                   }
                   canvas {
                     margin: 10px;
@@ -141,12 +148,13 @@ export default function PDFViewer({
                     max-width: calc(100% - 20px);
                     height: auto !important;
                     border-radius: 10px;
+                    background-color: white;
                   }
-                  #pageContainer.flipping-right {
+                  #currentPage.flipping-right {
                     transform-origin: left center;
                     animation: flipRight 0.8s cubic-bezier(0.4, 0, 0.2, 1);
                   }
-                  #pageContainer.flipping-left {
+                  #currentPage.flipping-left {
                     transform-origin: left center;
                     animation: flipLeft 0.8s cubic-bezier(0.4, 0, 0.2, 1);
                   }
@@ -183,7 +191,8 @@ export default function PDFViewer({
                   <button id="next">Next</button>
                 </div>
                 <div id="viewer">
-                  <div id="pageContainer"></div>
+                  <div id="currentPage" class="page-wrapper"></div>
+                  <div id="nextPage" class="page-wrapper"></div>
                 </div>
                 <script>
                   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -195,7 +204,7 @@ export default function PDFViewer({
                   const viewer = document.getElementById('viewer');
                   const pageInfo = document.getElementById('pageInfo');
                   
-                  const renderPage = async (num, scale = currentScale) => {
+                  const renderCanvas = async (num, scale = currentScale) => {
                     const page = await pdfDoc.getPage(num);
                     const viewport = page.getViewport({ scale });
                     
@@ -204,17 +213,30 @@ export default function PDFViewer({
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
                     
-                    const pageContainer = document.getElementById('pageContainer');
-                    pageContainer.innerHTML = '';
-                    pageContainer.appendChild(canvas);
-                    
                     await page.render({
                       canvasContext: context,
                       viewport: viewport
                     }).promise;
                     
+                    return canvas;
+                  };
+
+                  const updatePage = async (num) => {
+                    const currentCanvas = await renderCanvas(num);
+                    const currentPageDiv = document.getElementById('currentPage');
+                    currentPageDiv.innerHTML = '';
+                    currentPageDiv.appendChild(currentCanvas);
+                    
                     pageInfo.textContent = 'Page: ' + num;
                     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pageChange', page: num }));
+                  };
+
+                  const preRenderNextPage = async (num) => {
+                    if (num < 1 || num > pdfDoc.numPages) return;
+                    const canvas = await renderCanvas(num);
+                    const nextPageDiv = document.getElementById('nextPage');
+                    nextPageDiv.innerHTML = '';
+                    nextPageDiv.appendChild(canvas);
                   };
                   
                   const loadPDF = async () => {
@@ -223,14 +245,12 @@ export default function PDFViewer({
                       
                       document.getElementById('prev').onclick = () => {
                         if (currentPage <= 1 || isAnimating) return;
-                        currentPage--;
-                        renderPage(currentPage);
+                        handlePageChange(currentPage - 1);
                       };
                       
                       document.getElementById('next').onclick = () => {
                         if (currentPage >= pdfDoc.numPages || isAnimating) return;
-                        currentPage++;
-                        renderPage(currentPage);
+                        handlePageChange(currentPage + 1);
                       };
 
                       // Add touch swipe handling
@@ -255,33 +275,38 @@ export default function PDFViewer({
                         const diffY = Math.abs(touchStartY - touchEndY);
                         const timeDiff = touchEndTime - touchStartTime;
                         
-                        // Check if the swipe is more horizontal than vertical
                         if (Math.abs(diffX) > diffY && Math.abs(diffX) > 50 && timeDiff < 300) {
-                          const pageContainer = document.getElementById('pageContainer');
-                          
                           if (diffX > 0 && currentPage < pdfDoc.numPages) {
-                            isAnimating = true;
-                            pageContainer.className = 'flipping-right';
-                            setTimeout(() => {
-                              currentPage++;
-                              renderPage(currentPage);
-                              pageContainer.className = '';
-                              isAnimating = false;
-                            }, 400);
+                            handlePageChange(currentPage + 1, 'right');
                           } else if (diffX < 0 && currentPage > 1) {
-                            isAnimating = true;
-                            pageContainer.className = 'flipping-left';
-                            setTimeout(() => {
-                              currentPage--;
-                              renderPage(currentPage);
-                              pageContainer.className = '';
-                              isAnimating = false;
-                            }, 400);
+                            handlePageChange(currentPage - 1, 'left');
                           }
                         }
                       });
+
+                      const handlePageChange = async (newPage, direction) => {
+                        if (isAnimating) return;
+                        isAnimating = true;
+
+                        // Pre-render the next page
+                        await preRenderNextPage(newPage);
+
+                        const currentPageDiv = document.getElementById('currentPage');
+                        currentPageDiv.className = 'page-wrapper flipping-' + (direction || (newPage > currentPage ? 'right' : 'left'));
+
+                        setTimeout(async () => {
+                          currentPage = newPage;
+                          await updatePage(currentPage);
+                          currentPageDiv.className = 'page-wrapper';
+                          isAnimating = false;
+                        }, 400);
+                      };
                       
-                      renderPage(currentPage);
+                      // Initial render
+                      updatePage(currentPage);
+                      if (currentPage < pdfDoc.numPages) {
+                        preRenderNextPage(currentPage + 1);
+                      }
                     } catch (err) {
                       console.error('Error loading PDF:', err);
                     }
