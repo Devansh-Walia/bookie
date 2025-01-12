@@ -16,7 +16,7 @@ import { Book } from "../types";
 import PDFViewer from "./PDFViewer";
 
 export default function BookList() {
-  const { books, addBook, updatePage, removeBook } = useBookStore();
+  const { books, addBook, removeBook } = useBookStore();
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
   const handleAddBook = async () => {
@@ -57,10 +57,6 @@ export default function BookList() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.addButton} onPress={handleAddBook}>
-        <Text style={styles.buttonText}>Add Book</Text>
-      </TouchableOpacity>
-
       {selectedBook && (
         <Modal
           animationType="slide"
@@ -79,28 +75,31 @@ export default function BookList() {
       <ScrollView style={styles.bookList}>
         {books.map((book) => (
           <View key={book.id} style={styles.bookItem}>
-            <View style={styles.bookHeader}>
-              <Text style={styles.bookTitle}>{book.title}</Text>
-              <TouchableOpacity
-                onPress={() => removeBook(book.id)}
-                style={styles.removeButton}
-              >
-                <Text style={styles.removeButtonText}>×</Text>
-              </TouchableOpacity>
-            </View>
             <TouchableOpacity
               style={styles.bookContent}
               onPress={() => setSelectedBook(book)}
             >
-              <Text style={styles.pageText}>
-                Current page: {book.currentPage}
+              <View style={styles.bookHeader}>
+                <Text style={styles.bookTitle} numberOfLines={1}>
+                  {book.title}
+                </Text>
+              </View>
+              <Text style={styles.lastRead}>
+                Last read: {new Date(book.lastReadAt).toLocaleDateString()}
               </Text>
             </TouchableOpacity>
-            <Text style={styles.lastRead}>
-              Last read: {new Date(book.lastReadAt).toLocaleDateString()}
-            </Text>
+
+            <TouchableOpacity
+              onPress={() => removeBook(book.id)}
+              style={styles.removeButton}
+            >
+              <Text style={styles.removeButtonText}>×</Text>
+            </TouchableOpacity>
           </View>
         ))}
+        <TouchableOpacity style={styles.addButton} onPress={handleAddBook}>
+          <Text style={styles.buttonText}>Add Book</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -112,14 +111,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   addButton: {
-    backgroundColor: "#007AFF",
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
     marginBottom: 16,
+    borderColor: "gray",
+    borderWidth: 1,
+    borderStyle: "dashed",
   },
   buttonText: {
-    color: "white",
+    color: "gray",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -127,7 +128,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bookItem: {
-    backgroundColor: "white",
+    borderColor: "gray",
+    borderWidth: 1,
+    borderStyle: "dashed",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -147,9 +150,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     flex: 1,
+    color: "white",
   },
   removeButton: {
     padding: 4,
+    position: "absolute",
+    top: -5,
+    right: 10,
   },
   removeButtonText: {
     fontSize: 24,
@@ -158,13 +165,13 @@ const styles = StyleSheet.create({
   },
   bookContent: {
     padding: 8,
-    backgroundColor: "#f8f8f8",
     borderRadius: 6,
     marginVertical: 4,
+    color: "white",
   },
   pageText: {
     fontSize: 16,
-    color: "#666",
+    color: "white",
   },
   lastRead: {
     fontSize: 14,
