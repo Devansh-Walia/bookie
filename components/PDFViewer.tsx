@@ -51,9 +51,11 @@ export default function PDFViewer({
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-        <Text style={styles.closeButtonText}>×</Text>
-      </TouchableOpacity>
+      <View style={styles.closeContainer}>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Text style={styles.closeButtonText}>×</Text>
+        </TouchableOpacity>
+      </View>
       <WebView
         style={styles.webview}
         source={{
@@ -70,50 +72,107 @@ export default function PDFViewer({
                     height: 100vh;
                     display: flex;
                     flex-direction: column;
-                    background-color: #525659;
-                    font-family: system-ui;
+                    background-color: #2C3E50;
+                    font-family: -apple-system, BlinkMacSystemFont, system-ui;
                     touch-action: manipulation;
+                    overflow: hidden;
                   }
                   #controls {
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    padding: 10px;
-                    background-color: #333;
+                    padding: 15px;
+                    background-color: rgba(0, 0, 0, 0.8);
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    z-index: 100;
                   }
                   #controls button {
-                    margin: 0 10px;
-                    padding: 8px 16px;
-                    background: #666;
+                    margin: 0 15px;
+                    padding: 10px 20px;
+                    background: linear-gradient(145deg, #3498db, #2980b9);
                     border: none;
-                    border-radius: 4px;
+                    border-radius: 8px;
                     color: white;
                     font-size: 16px;
-                    min-width: 100px;
+                    font-weight: 500;
+                    min-width: 120px;
                     touch-action: manipulation;
+                    transition: transform 0.2s, background 0.3s;
+                    cursor: pointer;
                   }
                   #controls button:active {
-                    background: #777;
+                    transform: scale(0.95);
+                    background: linear-gradient(145deg, #2980b9, #3498db);
                   }
                   #pageInfo {
                     color: white;
-                    margin: 0 20px;
-                    min-width: 80px;
+                    margin: 0 10px;
+                    min-width: 100px;
                     text-align: center;
+                    font-size: 16px;
+                    font-weight: 500;
                   }
                   #viewer {
                     flex: 1;
-                    overflow: auto;
+                    overflow: hidden;
                     display: flex;
                     justify-content: center;
-                    align-items: flex-start;
-                    -webkit-overflow-scrolling: touch;
+                    align-items: center;
+                    position: relative;
+                    perspective: 1000px;
+                    transform-style: preserve-3d;
+                    background: #1a2634;
+                  }
+                  #pageContainer {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    transform-style: preserve-3d;
+                    transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1);
                   }
                   canvas {
                     margin: 10px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                    max-width: 100%;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+                    max-width: calc(100% - 20px);
                     height: auto !important;
+                    border-radius: 10px;
+                  }
+                  #pageContainer.flipping-right {
+                    transform-origin: left center;
+                    animation: flipRight 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                  }
+                  #pageContainer.flipping-left {
+                    transform-origin: left center;
+                    animation: flipLeft 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+                  }
+                  @keyframes flipRight {
+                    0% { 
+                      transform: rotateY(0deg) translateZ(0);
+                      box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+                    }
+                    50% {
+                      transform: rotateY(-90deg) translateZ(100px);
+                      box-shadow: -15px 0 35px rgba(0,0,0,0.2);
+                    }
+                    100% { 
+                      transform: rotateY(-180deg) translateZ(0);
+                      box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+                    }
+                  }
+                  @keyframes flipLeft {
+                    0% { 
+                      transform: rotateY(-90deg) translateZ(100px);
+                      box-shadow: 5px 0 25px rgba(0,0,0,0.1);
+                    }
+                    100% { 
+                      transform: rotateY(0deg) translateZ(0);
+                      box-shadow: 5px 0 25px rgba(0,0,0,0.1);
+                    }
                   }
                 </style>
               </head>
@@ -123,13 +182,16 @@ export default function PDFViewer({
                   <span id="pageInfo">Page: ${currentPage}</span>
                   <button id="next">Next</button>
                 </div>
-                <div id="viewer"></div>
+                <div id="viewer">
+                  <div id="pageContainer"></div>
+                </div>
                 <script>
                   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                   
                   let currentPage = ${currentPage};
                   let pdfDoc = null;
                   let currentScale = 1.5;
+                  let isAnimating = false;
                   const viewer = document.getElementById('viewer');
                   const pageInfo = document.getElementById('pageInfo');
                   
@@ -142,8 +204,9 @@ export default function PDFViewer({
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
                     
-                    viewer.innerHTML = '';
-                    viewer.appendChild(canvas);
+                    const pageContainer = document.getElementById('pageContainer');
+                    pageContainer.innerHTML = '';
+                    pageContainer.appendChild(canvas);
                     
                     await page.render({
                       canvasContext: context,
@@ -159,34 +222,61 @@ export default function PDFViewer({
                       pdfDoc = await pdfjsLib.getDocument({data: atob('${base64Content}')}).promise;
                       
                       document.getElementById('prev').onclick = () => {
-                        if (currentPage <= 1) return;
+                        if (currentPage <= 1 || isAnimating) return;
                         currentPage--;
                         renderPage(currentPage);
                       };
                       
                       document.getElementById('next').onclick = () => {
-                        if (currentPage >= pdfDoc.numPages) return;
+                        if (currentPage >= pdfDoc.numPages || isAnimating) return;
                         currentPage++;
                         renderPage(currentPage);
                       };
 
                       // Add touch swipe handling
                       let touchStartX = 0;
+                      let touchStartY = 0;
+                      let touchStartTime = 0;
+                      
                       viewer.addEventListener('touchstart', (e) => {
+                        if (isAnimating) return;
+                        touchStartTime = Date.now();
+                        touchStartY = e.touches[0].clientY;
                         touchStartX = e.touches[0].clientX;
                       });
                       
                       viewer.addEventListener('touchend', (e) => {
+                        if (isAnimating) return;
                         const touchEndX = e.changedTouches[0].clientX;
-                        const diff = touchStartX - touchEndX;
+                        const touchEndY = e.changedTouches[0].clientY;
+                        const touchEndTime = Date.now();
                         
-                        if (Math.abs(diff) > 50) { // Minimum swipe distance
-                          if (diff > 0 && currentPage < pdfDoc.numPages) {
-                            currentPage++;
-                            renderPage(currentPage);
-                          } else if (diff < 0 && currentPage > 1) {
-                            currentPage--;
-                            renderPage(currentPage);
+                        const diffX = touchStartX - touchEndX;
+                        const diffY = Math.abs(touchStartY - touchEndY);
+                        const timeDiff = touchEndTime - touchStartTime;
+                        
+                        // Check if the swipe is more horizontal than vertical
+                        if (Math.abs(diffX) > diffY && Math.abs(diffX) > 50 && timeDiff < 300) {
+                          const pageContainer = document.getElementById('pageContainer');
+                          
+                          if (diffX > 0 && currentPage < pdfDoc.numPages) {
+                            isAnimating = true;
+                            pageContainer.className = 'flipping-right';
+                            setTimeout(() => {
+                              currentPage++;
+                              renderPage(currentPage);
+                              pageContainer.className = '';
+                              isAnimating = false;
+                            }, 400);
+                          } else if (diffX < 0 && currentPage > 1) {
+                            isAnimating = true;
+                            pageContainer.className = 'flipping-left';
+                            setTimeout(() => {
+                              currentPage--;
+                              renderPage(currentPage);
+                              pageContainer.className = '';
+                              isAnimating = false;
+                            }, 400);
                           }
                         }
                       });
@@ -238,10 +328,15 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
   },
-  closeButton: {
+  closeContainer: {
     position: "absolute",
-    top: 10,
-    right: 20,
+    top: 90,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+  },
+  closeButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
