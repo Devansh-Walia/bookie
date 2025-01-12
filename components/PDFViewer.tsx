@@ -138,10 +138,6 @@ export default function PDFViewer({
                     z-index: 2;
                     transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1);
                   }
-                  #nextPage {
-                    z-index: 1;
-                    opacity: 0.999;
-                  }
                   canvas {
                     margin: 10px;
                     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
@@ -192,7 +188,6 @@ export default function PDFViewer({
                 </div>
                 <div id="viewer">
                   <div id="currentPage" class="page-wrapper"></div>
-                  <div id="nextPage" class="page-wrapper"></div>
                 </div>
                 <script>
                   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -231,14 +226,6 @@ export default function PDFViewer({
                     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pageChange', page: num }));
                   };
 
-                  const preRenderNextPage = async (num) => {
-                    if (num < 1 || num > pdfDoc.numPages) return;
-                    const canvas = await renderCanvas(num);
-                    const nextPageDiv = document.getElementById('nextPage');
-                    nextPageDiv.innerHTML = '';
-                    nextPageDiv.appendChild(canvas);
-                  };
-                  
                   const loadPDF = async () => {
                     try {
                       pdfDoc = await pdfjsLib.getDocument({data: atob('${base64Content}')}).promise;
@@ -287,26 +274,21 @@ export default function PDFViewer({
                       const handlePageChange = async (newPage, direction) => {
                         if (isAnimating) return;
                         isAnimating = true;
-
-                        // Pre-render the next page
-                        await preRenderNextPage(newPage);
-
+                        
                         const currentPageDiv = document.getElementById('currentPage');
                         currentPageDiv.className = 'page-wrapper flipping-' + (direction || (newPage > currentPage ? 'right' : 'left'));
-
-                        setTimeout(async () => {
-                          currentPage = newPage;
-                          await updatePage(currentPage);
+                        
+                        currentPage = newPage;
+                        await updatePage(currentPage);
+                        
+                        setTimeout(() => {
                           currentPageDiv.className = 'page-wrapper';
                           isAnimating = false;
-                        }, 400);
+                        }, 800);
                       };
                       
                       // Initial render
                       updatePage(currentPage);
-                      if (currentPage < pdfDoc.numPages) {
-                        preRenderNextPage(currentPage + 1);
-                      }
                     } catch (err) {
                       console.error('Error loading PDF:', err);
                     }
