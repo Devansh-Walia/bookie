@@ -1,20 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
-  View,
-  TouchableOpacity,
-  Text,
+  ActivityIndicator,
+  Platform,
   SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { WebView } from "react-native-webview";
+import { WebView, WebViewMessageEvent } from "react-native-webview";
 import * as FileSystem from "expo-file-system";
 import useBookStore from "../../store/bookStore";
+import { getPdfJsSources } from "../../utils/pdfjsAssets";
+import { buildPdfViewerHtml } from "./pdfViewerHtml";
 
 interface PDFViewerProps {
   bookId: string;
   fileUri: string;
   currentPage: number;
   onClose: () => void;
+}
+
+type ViewerStatus = "preparing" | "viewing" | "fatalError";
+
+// If we haven't heard *anything* back from the WebView (progress, ready, or
+// error) this long after it mounts, treat it as stuck rather than leaving
+// the user staring at a spinner forever.
+const STUCK_LOAD_TIMEOUT_MS = 30000;
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
 }
 
 export default function PDFViewer({
@@ -24,27 +41,164 @@ export default function PDFViewer({
   onClose,
 }: PDFViewerProps) {
   const { updatePage } = useBookStore();
-  const [base64Content, setBase64Content] = useState<string | null>(null);
+
+  const [status, setStatus] = useState<ViewerStatus>("preparing");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [webviewSource, setWebviewSource] = useState<
+    { html: string } | { uri: string } | null
+  >(null);
+  // Bumped on manual retry to force a full WebView remount (new JS context),
+  // which is the only reliable way to recover from a truly hung WebView.
+  const [retryToken, setRetryToken] = useState(0);
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearStuckLoadTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  const armStuckLoadTimeout = useCallback(() => {
+    clearStuckLoadTimeout();
+    timeoutRef.current = setTimeout(() => {
+      setStatus("fatalError");
+      setErrorMessage(
+        "This is taking much longer than expected. The PDF viewer may be stuck."
+      );
+    }, STUCK_LOAD_TIMEOUT_MS);
+  }, [clearStuckLoadTimeout]);
 
   useEffect(() => {
-    const loadPDF = async () => {
+    let cancelled = false;
+
+    async function prepare() {
+      setStatus("preparing");
+      setErrorMessage(null);
+      setWebviewSource(null);
+
       try {
-        const base64 = await FileSystem.readAsStringAsync(fileUri, {
-          encoding: FileSystem.EncodingType.Base64,
+        const { lib, worker } = await getPdfJsSources();
+        if (cancelled) return;
+
+        const html = buildPdfViewerHtml({
+          pdfLibSource: lib,
+          pdfWorkerSource: worker,
+          pdfUrl: fileUri,
+          initialPage: currentPage,
         });
-        setBase64Content(base64);
+
+        if (Platform.OS === "web") {
+          if (cancelled) return;
+          setWebviewSource({ html });
+        } else {
+          // Written to disk (rather than passed via source.html) so the page
+          // loads from a real file:// origin. PDF.js can then fetch the PDF
+          // file directly/streamed instead of the whole document being
+          // serialized across the RN<->WebView bridge as base64.
+          const htmlDir = `${FileSystem.documentDirectory}pdf-viewer-cache/`;
+          await FileSystem.makeDirectoryAsync(htmlDir, {
+            intermediates: true,
+          }).catch(() => {
+            // Already exists - fine.
+          });
+          const htmlPath = `${htmlDir}${bookId}.html`;
+          await FileSystem.writeAsStringAsync(htmlPath, html);
+          if (cancelled) return;
+          setWebviewSource({ uri: htmlPath });
+        }
+
+        if (!cancelled) {
+          setStatus("viewing");
+          armStuckLoadTimeout();
+        }
       } catch (error) {
-        console.error("Error loading PDF:", error);
+        if (cancelled) return;
+        setErrorMessage(describeError(error));
+        setStatus("fatalError");
       }
+    }
+
+    prepare();
+
+    return () => {
+      cancelled = true;
+      clearStuckLoadTimeout();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileUri, retryToken]);
 
-    loadPDF();
-  }, [fileUri]);
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      let data: any;
+      try {
+        data = JSON.parse(event.nativeEvent.data);
+      } catch {
+        return;
+      }
 
-  if (!base64Content) {
+      switch (data?.type) {
+        case "progress":
+          // Any progress means it's not stuck - push the watchdog out.
+          armStuckLoadTimeout();
+          break;
+        case "ready":
+          clearStuckLoadTimeout();
+          break;
+        case "pageChange":
+          if (typeof data.page === "number") {
+            updatePage(bookId, data.page);
+          }
+          break;
+        case "error":
+          // The in-page overlay already offers its own Retry button for
+          // load failures; just log for diagnostics.
+          console.warn("PDF viewer reported an error:", data.message);
+          break;
+      }
+    },
+    [armStuckLoadTimeout, clearStuckLoadTimeout, bookId, updatePage]
+  );
+
+  const handleRetry = useCallback(() => {
+    setRetryToken((token) => token + 1);
+  }, []);
+
+  if (status === "preparing") {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.loadingText}>Loading PDF...</Text>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#3498db" />
+          <Text style={styles.loadingText}>Preparing viewer…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (status === "fatalError") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <Text style={styles.errorTitle}>Couldn&apos;t open this PDF</Text>
+          {errorMessage ? (
+            <Text style={styles.errorMessage}>{errorMessage}</Text>
+          ) : null}
+          <View style={styles.errorActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.retryButton]}
+              onPress={handleRetry}
+            >
+              <Text style={styles.actionButtonText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.closeActionButton]}
+              onPress={onClose}
+            >
+              <Text style={styles.actionButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -56,281 +210,80 @@ export default function PDFViewer({
           <Text style={styles.closeButtonText}>×</Text>
         </TouchableOpacity>
       </View>
-      <WebView
-        style={styles.webview}
-        source={{
-          html: `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes">
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-                <style>
-                  body, html {
-                    margin: 0;
-                    padding: 0;
-                    height: 100vh;
-                    display: flex;
-                    flex-direction: column;
-                    background-color: #2C3E50;
-                    font-family: -apple-system, BlinkMacSystemFont, system-ui;
-                    touch-action: manipulation;
-                    overflow: hidden;
-                  }
-                  #controls {
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    padding: 15px;
-                    background-color: rgba(0, 0, 0, 0.8);
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                    z-index: 100;
-                  }
-                  #controls button {
-                    margin: 0 15px;
-                    padding: 10px 20px;
-                    background: linear-gradient(145deg, #3498db, #2980b9);
-                    border: none;
-                    border-radius: 8px;
-                    color: white;
-                    font-size: 16px;
-                    font-weight: 500;
-                    min-width: 120px;
-                    touch-action: manipulation;
-                    transition: transform 0.2s, background 0.3s;
-                    cursor: pointer;
-                  }
-                  #controls button:active {
-                    transform: scale(0.95);
-                    background: linear-gradient(145deg, #2980b9, #3498db);
-                  }
-                  #pageInfo {
-                    color: white;
-                    margin: 0 10px;
-                    min-width: 100px;
-                    text-align: center;
-                    font-size: 16px;
-                    font-weight: 500;
-                  }
-                  #viewer {
-                    flex: 1;
-                    overflow: hidden;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    position: relative;
-                    perspective: 1000px;
-                    transform-style: preserve-3d;
-                    background: #1a2634;
-                  }
-                  .page-wrapper {
-                    position: absolute;
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    transform-style: preserve-3d;
-                  }
-                  #currentPage {
-                    z-index: 2;
-                    transition: transform 0.8s cubic-bezier(0.5, 0, 0.2, 1);
-                  }
-                  canvas {
-                    margin: 10px;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-                    max-width: calc(100% - 20px);
-                    height: auto !important;
-                    border-radius: 10px;
-                    background-color: white;
-                  }
-                  #currentPage.flipping-right {
-                    transform-origin: left center;
-                    animation: flipRight 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-                  }
-                  #currentPage.flipping-left {
-                    transform-origin: left center;
-                    animation: flipLeft 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-                  }
-                  @keyframes flipRight {
-                    0% { 
-                      transform: rotateY(0deg) translateZ(0);
-                      box-shadow: -5px 0 25px rgba(0,0,0,0.1);
-                    }
-                    50% {
-                      transform: rotateY(-90deg) translateZ(100px);
-                      box-shadow: -15px 0 35px rgba(0,0,0,0.2);
-                    }
-                    100% { 
-                      transform: rotateY(-180deg) translateZ(0);
-                      box-shadow: -5px 0 25px rgba(0,0,0,0.1);
-                    }
-                  }
-                  @keyframes flipLeft {
-                    0% { 
-                      transform: rotateY(-90deg) translateZ(100px);
-                      box-shadow: 5px 0 25px rgba(0,0,0,0.1);
-                    }
-                    100% { 
-                      transform: rotateY(0deg) translateZ(0);
-                      box-shadow: 5px 0 25px rgba(0,0,0,0.1);
-                    }
-                  }
-                </style>
-              </head>
-              <body>
-                <div id="controls">
-                  <button id="prev">Previous</button>
-                  <span id="pageInfo">Page: ${currentPage}</span>
-                  <button id="next">Next</button>
-                </div>
-                <div id="viewer">
-                  <div id="currentPage" class="page-wrapper"></div>
-                </div>
-                <script>
-                  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                  
-                  let currentPage = ${currentPage};
-                  let pdfDoc = null;
-                  let currentScale = 1.5;
-                  let isAnimating = false;
-                  const viewer = document.getElementById('viewer');
-                  const pageInfo = document.getElementById('pageInfo');
-                  
-                  const renderCanvas = async (num, scale = currentScale) => {
-                    const page = await pdfDoc.getPage(num);
-                    const viewport = page.getViewport({ scale });
-                    
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    
-                    await page.render({
-                      canvasContext: context,
-                      viewport: viewport
-                    }).promise;
-                    
-                    return canvas;
-                  };
-
-                  const updatePage = async (num) => {
-                    const currentCanvas = await renderCanvas(num);
-                    const currentPageDiv = document.getElementById('currentPage');
-                    currentPageDiv.innerHTML = '';
-                    currentPageDiv.appendChild(currentCanvas);
-                    
-                    pageInfo.textContent = 'Page: ' + num;
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pageChange', page: num }));
-                  };
-
-                  const loadPDF = async () => {
-                    try {
-                      pdfDoc = await pdfjsLib.getDocument({data: atob('${base64Content}')}).promise;
-                      
-                      document.getElementById('prev').onclick = () => {
-                        if (currentPage <= 1 || isAnimating) return;
-                        handlePageChange(currentPage - 1);
-                      };
-                      
-                      document.getElementById('next').onclick = () => {
-                        if (currentPage >= pdfDoc.numPages || isAnimating) return;
-                        handlePageChange(currentPage + 1);
-                      };
-
-                      // Add touch swipe handling
-                      let touchStartX = 0;
-                      let touchStartY = 0;
-                      let touchStartTime = 0;
-                      
-                      viewer.addEventListener('touchstart', (e) => {
-                        if (isAnimating) return;
-                        touchStartTime = Date.now();
-                        touchStartY = e.touches[0].clientY;
-                        touchStartX = e.touches[0].clientX;
-                      });
-                      
-                      viewer.addEventListener('touchend', (e) => {
-                        if (isAnimating) return;
-                        const touchEndX = e.changedTouches[0].clientX;
-                        const touchEndY = e.changedTouches[0].clientY;
-                        const touchEndTime = Date.now();
-                        
-                        const diffX = touchStartX - touchEndX;
-                        const diffY = Math.abs(touchStartY - touchEndY);
-                        const timeDiff = touchEndTime - touchStartTime;
-                        
-                        if (Math.abs(diffX) > diffY && Math.abs(diffX) > 50 && timeDiff < 300) {
-                          if (diffX > 0 && currentPage < pdfDoc.numPages) {
-                            handlePageChange(currentPage + 1, 'right');
-                          } else if (diffX < 0 && currentPage > 1) {
-                            handlePageChange(currentPage - 1, 'left');
-                          }
-                        }
-                      });
-
-                      const handlePageChange = async (newPage, direction) => {
-                        if (isAnimating) return;
-                        isAnimating = true;
-                        
-                        const currentPageDiv = document.getElementById('currentPage');
-                        currentPageDiv.className = 'page-wrapper flipping-' + (direction || (newPage > currentPage ? 'right' : 'left'));
-                        
-                        currentPage = newPage;
-                        await updatePage(currentPage);
-                        
-                        setTimeout(() => {
-                          currentPageDiv.className = 'page-wrapper';
-                          isAnimating = false;
-                        }, 800);
-                      };
-                      
-                      // Initial render
-                      updatePage(currentPage);
-                    } catch (err) {
-                      console.error('Error loading PDF:', err);
-                    }
-                  };
-                  
-                  loadPDF();
-                </script>
-              </body>
-            </html>
-          `,
-        }}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        onMessage={(event) => {
-          try {
-            const data = JSON.parse(event.nativeEvent.data);
-            if (data.type === "pageChange") {
-              updatePage(bookId, data.page);
-            }
-          } catch (error) {
-            console.error("Error parsing message:", error);
-          }
-        }}
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.warn("WebView error: ", nativeEvent);
-        }}
-      />
+      {webviewSource ? (
+        <WebView
+          key={`${bookId}-${retryToken}`}
+          style={styles.webview}
+          source={webviewSource}
+          originWhitelist={["*"]}
+          javaScriptEnabled
+          domStorageEnabled
+          allowFileAccess
+          allowFileAccessFromFileURLs
+          allowUniversalAccessFromFileURLs
+          allowingReadAccessToURL={FileSystem.documentDirectory ?? undefined}
+          onMessage={handleMessage}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.warn("WebView error: ", nativeEvent);
+            setStatus("fatalError");
+            setErrorMessage("The PDF viewer failed to load.");
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "white",
+  },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
   loadingText: {
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    marginTop: 20,
+    marginTop: 16,
   },
-  container: {
-    flex: 1,
-    backgroundColor: "white",
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  errorActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButton: {
+    backgroundColor: "#3498db",
+  },
+  closeActionButton: {
+    backgroundColor: "#999",
+  },
+  actionButtonText: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "600",
   },
   webview: {
     flex: 1,
@@ -342,6 +295,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     width: "100%",
+    zIndex: 10,
   },
   closeButton: {
     width: 40,
