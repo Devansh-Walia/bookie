@@ -11,7 +11,7 @@ describe("buildPdfViewerHtml", () => {
 
     expect(html).toContain("var pdfjsLib = {};");
     expect(html).toContain("file:///books/example.pdf");
-    expect(html).toContain("Page: 3");
+    expect(html).toContain("Page 3");
   });
 
   it("never leaves an unescaped </script> sequence from inlined sources (would truncate the HTML)", () => {
@@ -63,7 +63,7 @@ describe("buildPdfViewerHtml", () => {
       initialPage: -5,
     });
 
-    expect(html).toContain("Page: 1");
+    expect(html).toContain("Page 1");
     expect(html).toContain("var currentPage = 1;");
   });
 

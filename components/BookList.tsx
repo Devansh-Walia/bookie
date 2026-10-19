@@ -1,62 +1,124 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Modal,
+  Alert,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import useBookStore from "../store/bookStore";
 import { Book } from "../types";
 import PDFViewer from "./PDF/PDFViewer";
+import { useBookActions } from "../hooks/useBookActions";
+import { palette, radius, spacing } from "../constants/theme";
 
-export default function BookList() {
-  const { books, addBook, removeBook } = useBookStore();
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+// A small set of accent hues used to give each book a distinct, colorful
+// thumbnail so the library feels lively without any image assets.
+const BOOK_ACCENTS = [
+  "#6366F1",
+  "#8B5CF6",
+  "#0EA5E9",
+  "#10B981",
+  "#F59E0B",
+  "#EC4899",
+  "#F43F5E",
+];
 
-  const handleAddBook = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf"],
-        copyToCacheDirectory: true,
-      });
+function accentForId(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  return BOOK_ACCENTS[Math.abs(hash) % BOOK_ACCENTS.length];
+}
 
-      if (result.canceled) {
-        return;
-      }
+function formatLastRead(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return `Today, ${date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
+}
 
-      const file = result.assets[0];
-      const bookDir = `${FileSystem.documentDirectory}books/`;
-      const newPath = `${bookDir}${Date.now()}-${file.name}`;
+function BookCard({
+  book,
+  onSelect,
+  onRemove,
+}: {
+  book: Book;
+  onSelect: (book: Book) => void;
+  onRemove: (id: string) => void;
+}) {
+  const accent = accentForId(book.id);
+  const title = book.title.replace(/\.pdf$/i, "");
 
-      // Ensure books directory exists
-      await FileSystem.makeDirectoryAsync(bookDir, { intermediates: true });
-
-      // Copy file to app's document directory
-      await FileSystem.copyAsync({
-        from: file.uri,
-        to: newPath,
-      });
-
-      addBook({
-        title: file.name,
-        filePath: newPath,
-        fileUri: newPath,
-        totalPages: 0,
-        currentPage: 1,
-      });
-    } catch (err) {
-      Alert.alert("Error", "Failed to pick document");
-    }
+  const confirmRemove = () => {
+    Alert.alert("Remove book", `Remove "${title}" from your library?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: () => onRemove(book.id) },
+    ]);
   };
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={() => onSelect(book)}
+    >
+      <View style={[styles.thumb, { backgroundColor: accent }]}>
+        <Ionicons name="book" size={26} color="#fff" />
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={styles.cardMeta}>
+          {book.currentPage > 1
+            ? `Page ${book.currentPage}`
+            : "Not started yet"}
+        </Text>
+        <Text style={styles.cardDate}>Last read {formatLastRead(book.lastReadAt)}</Text>
+      </View>
+      <TouchableOpacity
+        style={styles.removeButton}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        onPress={confirmRemove}
+      >
+        <Ionicons name="trash-outline" size={20} color={palette.textSecondary} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
+export default function BookList() {
+  const { books, removeBook } = useBookStore();
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const { handleAddBook } = useBookActions();
+
+  const sortedBooks = useMemo(
+    () =>
+      [...books].sort(
+        (a, b) =>
+          new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime()
+      ),
+    [books]
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       {selectedBook && (
         <Modal
           animationType="slide"
@@ -72,110 +134,214 @@ export default function BookList() {
         </Modal>
       )}
 
-      <ScrollView style={styles.bookList}>
-        {books.map((book) => (
-          <View key={book.id} style={styles.bookItem}>
-            <TouchableOpacity
-              style={styles.bookContent}
-              onPress={() => setSelectedBook(book)}
-            >
-              <View style={styles.bookHeader}>
-                <Text style={styles.bookTitle} numberOfLines={1}>
-                  {book.title}
-                </Text>
-              </View>
-              <Text style={styles.lastRead}>
-                Last read: {new Date(book.lastReadAt).toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => removeBook(book.id)}
-              style={styles.removeButton}
-            >
-              <Text style={styles.removeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-        <TouchableOpacity style={styles.addButton} onPress={handleAddBook}>
-          <Text style={styles.buttonText}>Add Book</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Your Library</Text>
+          <Text style={styles.headerSubtitle}>
+            {books.length === 0
+              ? "No books yet"
+              : `${books.length} ${books.length === 1 ? "book" : "books"}`}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.headerAddButton} onPress={handleAddBook}>
+          <Ionicons name="add" size={22} color="#fff" />
         </TouchableOpacity>
-      </ScrollView>
-    </View>
+      </View>
+
+      {sortedBooks.length === 0 ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="library-outline" size={44} color={palette.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>Start your collection</Text>
+          <Text style={styles.emptyText}>
+            Import a PDF and it will show up here, ready to read with a tap.
+          </Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={handleAddBook}>
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.emptyButtonText}>Add your first book</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {sortedBooks.map((book) => (
+            <BookCard
+              key={book.id}
+              book={book}
+              onSelect={setSelectedBook}
+              onRemove={removeBook}
+            />
+          ))}
+          <TouchableOpacity style={styles.addButton} onPress={handleAddBook}>
+            <Ionicons name="add-circle-outline" size={20} color={palette.primary} />
+            <Text style={styles.addButtonText}>Add another book</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    padding: 16,
+    backgroundColor: palette.lightBackground,
   },
-  addButton: {
-    padding: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    marginBottom: 16,
-    borderColor: "gray",
-    borderWidth: 1,
-    borderStyle: "dashed",
-  },
-  buttonText: {
-    color: "gray",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  bookList: {
-    flex: 1,
-  },
-  bookItem: {
-    borderColor: "gray",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  bookHeader: {
+  header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
-  bookTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  headerTitle: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: palette.textPrimary,
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: palette.textSecondary,
+    marginTop: 2,
+  },
+  headerAddButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: palette.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: palette.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  list: {
     flex: 1,
-    color: "white",
+  },
+  listContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: palette.lightCard,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm + 4,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: palette.lightBorder,
+  },
+  thumb: {
+    width: 52,
+    height: 64,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardBody: {
+    flex: 1,
+    marginLeft: spacing.md,
+    marginRight: spacing.sm,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: palette.textPrimary,
+  },
+  cardMeta: {
+    fontSize: 13,
+    color: palette.textSecondary,
+    marginTop: 3,
+  },
+  cardDate: {
+    fontSize: 12,
+    color: palette.textSecondary,
+    opacity: 0.8,
+    marginTop: 2,
   },
   removeButton: {
-    padding: 4,
-    position: "absolute",
-    top: -5,
-    right: 10,
+    padding: spacing.sm,
+    borderRadius: radius.pill,
   },
-  removeButtonText: {
-    fontSize: 24,
-    color: "#FF3B30",
+  addButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    marginTop: spacing.sm,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: palette.primary,
+    backgroundColor: palette.accentSoft,
+  },
+  addButtonText: {
+    color: palette.primary,
+    fontSize: 15,
     fontWeight: "600",
   },
-  bookContent: {
-    padding: 8,
-    borderRadius: 6,
-    marginVertical: 4,
-    color: "white",
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl * 2,
   },
-  pageText: {
+  emptyIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: palette.accentSoft,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: palette.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  emptyText: {
+    fontSize: 15,
+    color: palette.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+    maxWidth: 280,
+  },
+  emptyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: radius.pill,
+    backgroundColor: palette.primary,
+    shadowColor: palette.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  emptyButtonText: {
+    color: "#fff",
     fontSize: 16,
-    color: "white",
-  },
-  lastRead: {
-    fontSize: 14,
-    color: "#888",
-    marginTop: 4,
+    fontWeight: "600",
   },
 });
