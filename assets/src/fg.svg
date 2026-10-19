@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><g transform="translate(512 512) scale(.82) translate(-512 -512)">
+<g transform="translate(512 530)">
+  <path d="M-20 -190 C-110 -240 -230 -240 -300 -205 L-300 175 C-230 140 -110 140 -20 190 Z" fill="#fff"/>
+  <path d="M20 -190 C110 -240 230 -240 300 -205 L300 175 C230 140 110 140 20 190 Z" fill="#fff" fill-opacity=".88"/>
+  <path d="M-250 -150 C-170 -175 -100 -170 -60 -150 M-250 -85 C-170 -110 -100 -105 -60 -85 M-250 -20 C-170 -45 -100 -40 -60 -20" stroke="#6366F1" stroke-opacity=".35" stroke-width="16" stroke-linecap="round" fill="none"/>
+  <clipPath id="c"><path d="M20 -190 C110 -240 230 -240 300 -205 L300 175 C230 140 110 140 20 190 Z"/></clipPath><path clip-path="url(#c)" d="M110 -260 L110 -20 L165 -68 L220 -20 L220 -260 Z" fill="#F59E0B"/>
+</g></g></svg>

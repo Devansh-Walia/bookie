@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bookie – a fun PDF reader</title>
+<meta name="description" content="Bookie is a PDF reader with bookmarks, highlights, reading streaks, stats and themes.">
+<link rel="icon" href="icon.png">
+<style>
+:root{--bg:#F7F8FC;--fg:#1c1e2b;--accent:#5b5bd6;--card:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#12131a;--fg:#eceef7;--card:#1c1e2b}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6}
+main{max-width:860px;margin:auto;padding:64px 20px;text-align:center}
+img.logo{width:112px;height:112px;border-radius:26px;box-shadow:0 8px 24px #0003}
+h1{font-size:2.6rem;margin:16px 0 4px}p.lead{font-size:1.2rem;opacity:.8}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:28px 0}
+a.btn{background:var(--accent);color:#fff;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:600}
+a.btn.alt{background:var(--card);color:var(--fg);border:1px solid #8884}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:40px;text-align:left}
+.card{background:var(--card);padding:20px;border-radius:16px;box-shadow:0 2px 8px #0001}
+.card h3{margin:0 0 6px}small{opacity:.7;display:block;max-width:560px;margin:auto}
+footer{margin-top:48px;opacity:.6;font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="icon.png" alt="Bookie icon">
+  <h1>Bookie</h1>
+  <p class="lead">Read PDFs the fun way — covers, streaks, stats, highlights and themes.</p>
+  <div class="btns">
+    <a class="btn" id="apk" href="https://github.com/Devansh-Walia/bookie/releases/latest">Download for Android (.apk)</a>
+    <a class="btn" id="ipa" href="https://github.com/Devansh-Walia/bookie/releases/latest">Download for iOS (.ipa)</a>
+    <a class="btn alt" href="https://github.com/Devansh-Walia/bookie">View on GitHub</a>
+  </div>
+  <small id="ver">Latest release on GitHub.</small>
+  <small>iOS builds are unsigned and must be sideloaded (e.g. AltStore or Sideloadly). On Android, allow “install unknown apps”.</small>
+  <div class="grid">
+    <div class="card"><h3>📚 Library</h3>Import PDFs and see them with covers and progress.</div>
+    <div class="card"><h3>🔖 Bookmarks &amp; highlights</h3>Mark pages and highlight text as you read.</div>
+    <div class="card"><h3>🔥 Streaks &amp; stats</h3>Build a daily reading habit with celebrations.</div>
+    <div class="card"><h3>🎨 Themes</h3>Light, dark and more for comfortable reading.</div>
+  </div>
+  <footer>© Bookie · <a href="https://github.com/Devansh-Walia/bookie/releases">All releases</a></footer>
+</main>
+<script>
+fetch("https://api.github.com/repos/Devansh-Walia/bookie/releases/latest").then(r=>r.json()).then(r=>{
+  if(!r.assets)return;
+  for(const a of r.assets){
+    if(a.name.endsWith(".apk"))apk.href=a.browser_download_url;
+    if(a.name.endsWith(".ipa"))ipa.href=a.browser_download_url;
+  }
+  ver.textContent="Latest version: "+r.tag_name;
+}).catch(()=>{});
+</script>
+</body>
+</html>
