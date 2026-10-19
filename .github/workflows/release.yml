@@ -4,6 +4,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      build_ios:
+        description: 'Also build unsigned iOS IPA (experimental)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -28,13 +33,14 @@ jobs:
         with: { name: android, path: Bookie-*.apk }
 
   ios:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ios }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx expo prebuild --platform ios --no-install
+      - run: npx expo prebuild --platform ios
       - name: Build unsigned app
         working-directory: ios
         run: |
@@ -52,6 +58,7 @@ jobs:
 
   release:
     needs: [android, ios]
+    if: ${{ !cancelled() && needs.android.result == 'success' && (needs.ios.result == 'success' || needs.ios.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
