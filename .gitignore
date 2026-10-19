@@ -34,3 +34,13 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Native projects are generated from app.json (Continuous Native Generation).
+# Run `npx expo prebuild` / `npx expo run:android` to regenerate.
+/android
+/ios
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
