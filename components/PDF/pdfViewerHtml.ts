@@ -35,11 +35,13 @@ export interface BuildPdfViewerHtmlOptions {
   bookmarks?: BookmarkInput[];
   /** Existing highlights to draw onto their pages. */
   highlights?: HighlightInput[];
+  /** Reader theme id applied via `body[data-theme]`. */
+  theme?: string;
 }
 
 /** Escapes any `</script` sequence so inlined source can't prematurely
  * terminate the enclosing <script> tag when the HTML parser scans it. */
-function escapeClosingScriptTag(source: string): string {
+export function escapeClosingScriptTag(source: string): string {
   return source.replace(/<\/script/gi, "<\\/script");
 }
 
@@ -62,10 +64,11 @@ export function buildPdfViewerHtml({
   initialPage,
   bookmarks = [],
   highlights = [],
+  theme = "original",
 }: BuildPdfViewerHtmlOptions): string {
   const safeLibSource = escapeClosingScriptTag(pdfLibSource);
   const workerSourceLiteral = escapeClosingScriptTag(
-    JSON.stringify(pdfWorkerSource)
+    JSON.stringify(pdfWorkerSource),
   );
   const pdfUrlLiteral = escapeClosingScriptTag(JSON.stringify(pdfUrl));
   const safeInitialPage =
@@ -74,6 +77,7 @@ export function buildPdfViewerHtml({
       : 1;
   const bookmarksLiteral = escapeClosingScriptTag(JSON.stringify(bookmarks));
   const highlightsLiteral = escapeClosingScriptTag(JSON.stringify(highlights));
+  const safeTheme = /^[a-z-]+$/.test(theme) ? theme : "original";
 
   const script = buildViewerScript({
     pdfUrlLiteral,
@@ -91,7 +95,7 @@ export function buildPdfViewerHtml({
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
     <style>${VIEWER_CSS}</style>
   </head>
-  <body>
+  <body data-theme="${safeTheme}">
     <div id="viewer">
       <div id="pageBack" class="page-layer"></div>
       <div id="pageFront" class="page-layer"></div>

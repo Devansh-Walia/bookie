@@ -1,4 +1,44 @@
-# Bookie App - Comprehensive Memory Bank
+# Bookie App - Memory Bank
+
+> **Current state (SDK 58 upgrade + engagement features).** Sections further
+> below describe the original v1 design and are partly outdated (e.g. the PDF.js
+> CDN and absolute file paths are gone).
+
+- **Stack:** Expo SDK 58, React 19.3, RN 0.88 (New Architecture), expo-router,
+  TypeScript 6, zustand 5, Jest 30 (`npm test`, `npm run typecheck`).
+- **Native folders are generated (CNG):** `android/` and `ios/` are gitignored;
+  `app.json` is the source of truth. `npx expo run:android` regenerates them.
+- **Package manager:** npm (`package-lock.json`). Don't mix in pnpm.
+- **Files:** `utils/files.ts` uses the new `expo-file-system` `File`/`Directory`
+  API. Books are stored by **file name** (`book.fileName`) in `Documents/books/`,
+  and covers in `Documents/covers/`. Paths are resolved at runtime because the
+  iOS container path changes between installs.
+- **Stores** (all persisted to AsyncStorage):
+  - `bookStore` (v2, migration in `store/migrations.ts`): books, progress,
+    covers, finished state, bookmarks, highlights.
+  - `statsStore`: per-day `{pages, seconds}` log, finished history, daily goal,
+    night-owl/early-bird flags.
+  - `settingsStore`: reader theme, haptics.
+- **Covers:** `components/CoverGenerator.tsx` (mounted in the root layout)
+  renders page 1 of each `coverStatus: "pending"` book in an invisible WebView
+  (`components/PDF/coverHtml.ts`). It also fills in `totalPages` and a title
+  from the PDF metadata unless the user renamed the book.
+- **Reading sessions:** `hooks/useReadingSession.ts` plus the pure
+  `utils/sessionTracker.ts`. Distinct pages turned count as pages read; time
+  counts only while the app is in the foreground, capped at 5 minutes after
+  the last page turn.
+- **Stats/streaks/badges:** pure functions in `utils/stats.ts`, shown in the
+  Stats tab (`components/StatsScreen.tsx`).
+- **Reader themes:** `constants/readerThemes.ts` holds the metadata; the CSS
+  lives in `pdfViewerStyles.ts` (`body[data-theme]`) and themes switch live
+  via `window.__bookie.setTheme`.
+- **Fun bits:** confetti `Celebration` on reaching the last page, a session
+  toast after closing the reader, and haptics (`utils/haptics.ts`).
+- **Roadmap:** see `future.md` (monetization / Pro).
+
+---
+
+# Original v1 notes
 
 ## 🏗️ **Project Overview**
 

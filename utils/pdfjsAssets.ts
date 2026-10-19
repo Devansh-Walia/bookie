@@ -1,5 +1,5 @@
 import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
 import { Platform } from "react-native";
 
 // Vendored PDF.js UMD builds (see scripts/copy-pdfjs-assets.js), bundled as
@@ -33,14 +33,14 @@ async function readAssetAsText(moduleAsset: number): Promise<string> {
     const response = await fetch(uri);
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch pdf.js asset "${uri}" (status ${response.status})`
+        `Failed to fetch pdf.js asset "${uri}" (status ${response.status})`,
       );
     }
     return await response.text();
   }
 
   // On native, expo-asset downloads/copies the asset to a local file:// URI.
-  return FileSystem.readAsStringAsync(uri);
+  return new File(uri).text();
 }
 
 /**

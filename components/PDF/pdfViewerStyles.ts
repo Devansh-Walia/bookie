@@ -142,4 +142,37 @@ html, body {
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
 }
 #retryButton:active { transform: scale(0.96); }
+
+/* ---- Reader themes (body[data-theme]) ---------------------------------- */
+.page-container canvas { transition: filter 0.35s ease; }
+#viewer { transition: background 0.35s ease; }
+
+body[data-theme="sepia"] #viewer {
+  background: radial-gradient(120% 120% at 50% 0%, #3A2D20 0%, #2A2118 70%);
+}
+body[data-theme="sepia"] .page-container canvas {
+  filter: sepia(0.5) saturate(1.15) brightness(0.97) contrast(0.94);
+}
+
+body[data-theme="night"] #viewer {
+  background: radial-gradient(120% 120% at 50% 0%, #111116 0%, #050507 70%);
+}
+body[data-theme="night"] .page-container canvas {
+  filter: invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+body[data-theme="night"] .hl-rect { mix-blend-mode: screen; opacity: 0.55; }
+body[data-theme="night"] .book-stack { filter: brightness(0.35); }
+
+body[data-theme="candlelight"] #viewer {
+  background: radial-gradient(110% 90% at 50% 40%, #3B2410 0%, #1A0F06 75%);
+}
+body[data-theme="candlelight"] .page-container canvas {
+  filter: sepia(0.75) saturate(1.35) hue-rotate(-12deg) brightness(0.86) contrast(0.95);
+}
+body[data-theme="candlelight"] .page-container::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  border-radius: 6px;
+  background: radial-gradient(90% 70% at 50% 45%, rgba(255, 170, 80, 0.06) 0%, rgba(40, 18, 0, 0.32) 100%);
+}
+body[data-theme="candlelight"] .book-stack { filter: sepia(0.8) brightness(0.6); }
 `;

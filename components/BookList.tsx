@@ -1,200 +1,384 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  View,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Modal,
-  Alert,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import useBookStore from "../store/bookStore";
+import useStatsStore from "../store/statsStore";
 import { Book } from "../types";
 import PDFViewer from "./PDF/PDFViewer";
 import { useBookActions } from "../hooks/useBookActions";
 import { palette, radius, spacing } from "../constants/theme";
+import { BookCover, ProgressBar, progressOf } from "./BookCover";
+import { BookActionsSheet } from "./BookActionsSheet";
+import { SessionToast, ToastMessage } from "./SessionToast";
+import { Celebration } from "./Celebration";
+import {
+  computeStreaks,
+  sessionMessage,
+  snapshot,
+  ProgressSnapshot,
+} from "../utils/stats";
+import { haptics } from "../utils/haptics";
 
-// A small set of accent hues used to give each book a distinct, colorful
-// thumbnail so the library feels lively without any image assets.
-const BOOK_ACCENTS = [
-  "#6366F1",
-  "#8B5CF6",
-  "#0EA5E9",
-  "#10B981",
-  "#F59E0B",
-  "#EC4899",
-  "#F43F5E",
+type Filter = "all" | "reading" | "unread" | "finished";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "reading", label: "Reading" },
+  { id: "unread", label: "Unread" },
+  { id: "finished", label: "Finished" },
 ];
 
-function accentForId(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+const COLUMNS = 3;
+const GAP = 14;
+
+function matchesFilter(book: Book, filter: Filter) {
+  switch (filter) {
+    case "reading":
+      return !book.finishedAt && book.currentPage > 1;
+    case "unread":
+      return !book.finishedAt && book.currentPage <= 1;
+    case "finished":
+      return !!book.finishedAt;
+    default:
+      return true;
   }
-  return BOOK_ACCENTS[Math.abs(hash) % BOOK_ACCENTS.length];
 }
 
-function formatLastRead(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) {
-    return `Today, ${date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-  }
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
-  });
-}
-
-function BookCard({
-  book,
-  onSelect,
-  onRemove,
-}: {
-  book: Book;
-  onSelect: (book: Book) => void;
-  onRemove: (id: string) => void;
-}) {
-  const accent = accentForId(book.id);
-  const title = book.title.replace(/\.pdf$/i, "");
-
-  const confirmRemove = () => {
-    Alert.alert("Remove book", `Remove "${title}" from your library?`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: () => onRemove(book.id) },
-    ]);
-  };
-
-  return (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.85}
-      onPress={() => onSelect(book)}
-    >
-      <View style={[styles.thumb, { backgroundColor: accent }]}>
-        <Ionicons name="book" size={26} color="#fff" />
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={styles.cardMeta}>
-          {book.currentPage > 1
-            ? `Page ${book.currentPage}`
-            : "Not started yet"}
-        </Text>
-        <Text style={styles.cardDate}>Last read {formatLastRead(book.lastReadAt)}</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.removeButton}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        onPress={confirmRemove}
-      >
-        <Ionicons name="trash-outline" size={20} color={palette.textSecondary} />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
+function statusLine(book: Book): string {
+  if (book.finishedAt) return "Finished";
+  if (book.currentPage <= 1) return "New";
+  if (!book.totalPages) return `Page ${book.currentPage}`;
+  return `${Math.round(progressOf(book) * 100)}%`;
 }
 
 export default function BookList() {
-  const { books, removeBook } = useBookStore();
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const books = useBookStore((s) => s.books);
+  const removeBook = useBookStore((s) => s.removeBook);
+  const renameBook = useBookStore((s) => s.renameBook);
+  const setFinished = useBookStore((s) => s.setFinished);
+  const days = useStatsStore((s) => s.days);
+  const dailyGoal = useStatsStore((s) => s.dailyGoal);
+  const finishedCount = useStatsStore((s) => s.finished.length);
+  const recordFinished = useStatsStore((s) => s.recordFinished);
+  const unrecordFinished = useStatsStore((s) => s.unrecordFinished);
   const { handleAddBook } = useBookActions();
 
-  const sortedBooks = useMemo(
-    () =>
-      [...books].sort(
-        (a, b) =>
-          new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime()
-      ),
-    [books]
+  const [readingId, setReadingId] = useState<string | null>(null);
+  const [actionsBook, setActionsBook] = useState<Book | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [celebrate, setCelebrate] = useState<Book | null>(null);
+  const beforeRef = useRef<ProgressSnapshot | null>(null);
+
+  const streak = useMemo(() => computeStreaks(days), [days]);
+  const todayPages = snapshot(days).today.pages;
+
+  const sorted = useMemo(
+    () => [...books].sort((a, b) => b.lastReadAt.localeCompare(a.lastReadAt)),
+    [books],
+  );
+  const continueBook = useMemo(
+    () => sorted.find((b) => !b.finishedAt && b.currentPage > 1) ?? null,
+    [sorted],
+  );
+  const visible = useMemo(
+    () => sorted.filter((b) => matchesFilter(b, filter)),
+    [sorted, filter],
+  );
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = {
+      all: books.length,
+      reading: 0,
+      unread: 0,
+      finished: 0,
+    };
+    for (const b of books) {
+      if (matchesFilter(b, "reading")) c.reading++;
+      else if (matchesFilter(b, "unread")) c.unread++;
+      else if (matchesFilter(b, "finished")) c.finished++;
+    }
+    return c;
+  }, [books]);
+
+  const tileWidth = Math.floor(
+    (width - spacing.lg * 2 - GAP * (COLUMNS - 1)) / COLUMNS,
   );
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      {selectedBook && (
-        <Modal
-          animationType="slide"
-          visible={!!selectedBook}
-          onRequestClose={() => setSelectedBook(null)}
-        >
-          <PDFViewer
-            bookId={selectedBook.id}
-            fileUri={selectedBook.fileUri}
-            currentPage={selectedBook.currentPage}
-            onClose={() => setSelectedBook(null)}
-          />
-        </Modal>
-      )}
+  const openBook = useCallback((book: Book) => {
+    beforeRef.current = snapshot(useStatsStore.getState().days);
+    haptics.tap();
+    setReadingId(book.id);
+  }, []);
 
+  const closeReader = useCallback(() => {
+    setReadingId(null);
+    // Let the reader unmount (which flushes the session) before diffing stats.
+    setTimeout(() => {
+      const before = beforeRef.current;
+      beforeRef.current = null;
+      if (!before) return;
+      const state = useStatsStore.getState();
+      const msg = sessionMessage(before, snapshot(state.days), state.dailyGoal);
+      if (msg) setToast({ id: Date.now(), ...msg });
+    }, 120);
+  }, []);
+
+  const toggleFinished = useCallback(
+    (book: Book) => {
+      if (book.finishedAt) {
+        setFinished(book.id, false);
+        unrecordFinished(book.id);
+      } else {
+        setFinished(book.id, true);
+        recordFinished(book.id, book.title);
+        haptics.success();
+        setCelebrate(book);
+      }
+    },
+    [setFinished, recordFinished, unrecordFinished],
+  );
+
+  const addBooks = useCallback(async () => {
+    const ids = await handleAddBook();
+    if (ids.length) {
+      haptics.success();
+      setFilter("all");
+      setToast({
+        id: Date.now(),
+        title:
+          ids.length === 1 ? "📚 Book added" : `📚 ${ids.length} books added`,
+        subtitle: "Generating covers…",
+      });
+    }
+  }, [handleAddBook]);
+
+  const header = (
+    <View>
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Your Library</Text>
           <Text style={styles.headerSubtitle}>
             {books.length === 0
               ? "No books yet"
-              : `${books.length} ${books.length === 1 ? "book" : "books"}`}
+              : `${books.length} ${books.length === 1 ? "book" : "books"} · ${finishedCount} finished`}
           </Text>
         </View>
-        <TouchableOpacity style={styles.headerAddButton} onPress={handleAddBook}>
+        <TouchableOpacity
+          style={[
+            styles.streakChip,
+            !streak.readToday && streak.current > 0 && styles.streakChipAtRisk,
+          ]}
+          onPress={() => router.push("/stats")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.streakText}>
+            {streak.current > 0 ? "🔥" : "🌱"} {streak.current}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.headerAddButton} onPress={addBooks}>
           <Ionicons name="add" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {sortedBooks.length === 0 ? (
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="library-outline" size={44} color={palette.primary} />
-          </View>
-          <Text style={styles.emptyTitle}>Start your collection</Text>
-          <Text style={styles.emptyText}>
-            Import a PDF and it will show up here, ready to read with a tap.
-          </Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={handleAddBook}>
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.emptyButtonText}>Add your first book</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
+      {continueBook && filter === "all" ? (
+        <TouchableOpacity
+          style={styles.hero}
+          activeOpacity={0.9}
+          onPress={() => openBook(continueBook)}
         >
-          {sortedBooks.map((book) => (
-            <BookCard
-              key={book.id}
-              book={book}
-              onSelect={setSelectedBook}
-              onRemove={removeBook}
+          <BookCover book={continueBook} width={78} />
+          <View style={styles.heroBody}>
+            <Text style={styles.heroEyebrow}>CONTINUE READING</Text>
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {continueBook.title}
+            </Text>
+            <Text style={styles.heroMeta}>
+              {continueBook.totalPages
+                ? `Page ${continueBook.currentPage} of ${continueBook.totalPages} · ${Math.round(
+                    progressOf(continueBook) * 100,
+                  )}%`
+                : `Page ${continueBook.currentPage}`}
+            </Text>
+            <ProgressBar
+              value={progressOf(continueBook)}
+              color="#fff"
+              height={5}
             />
-          ))}
-          <TouchableOpacity style={styles.addButton} onPress={handleAddBook}>
-            <Ionicons name="add-circle-outline" size={20} color={palette.primary} />
-            <Text style={styles.addButtonText}>Add another book</Text>
-          </TouchableOpacity>
-        </ScrollView>
+            <View style={styles.heroGoal}>
+              <Text style={styles.heroGoalText}>
+                {todayPages >= dailyGoal
+                  ? "🎯 Goal done today!"
+                  : `Today ${todayPages}/${dailyGoal} pages`}
+              </Text>
+              <View style={styles.heroPlay}>
+                <Ionicons name="play" size={14} color={palette.primary} />
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      ) : null}
+
+      {books.length > 0 ? (
+        <View style={styles.filters}>
+          {FILTERS.map((f) => {
+            const active = f.id === filter;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => {
+                  haptics.tap();
+                  setFilter(f.id);
+                }}
+              >
+                <Text
+                  style={[styles.chipText, active && styles.chipTextActive]}
+                >
+                  {f.label} {counts[f.id] > 0 ? counts[f.id] : ""}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <Modal
+        animationType="slide"
+        visible={!!readingId}
+        onRequestClose={closeReader}
+      >
+        {readingId ? (
+          <PDFViewer bookId={readingId} onClose={closeReader} />
+        ) : null}
+      </Modal>
+
+      {books.length === 0 ? (
+        <>
+          {header}
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Ionicons
+                name="library-outline"
+                size={44}
+                color={palette.primary}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Start your collection</Text>
+            <Text style={styles.emptyText}>
+              Import PDFs and build a reading streak. Covers, progress and stats
+              appear automatically.
+            </Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={addBooks}>
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text style={styles.emptyButtonText}>Add your first book</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : (
+        <FlatList
+          data={visible}
+          key={`grid-${COLUMNS}`}
+          numColumns={COLUMNS}
+          keyExtractor={(b) => b.id}
+          ListHeaderComponent={header}
+          contentContainerStyle={styles.listContent}
+          columnWrapperStyle={{ gap: GAP, paddingHorizontal: spacing.lg }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <Text style={styles.filterEmpty}>
+              {filter === "finished"
+                ? "No finished books yet — you've got this! 💪"
+                : "Nothing here yet."}
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              style={({ pressed }) => [
+                { width: tileWidth, marginBottom: spacing.lg },
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={() => openBook(item)}
+              onLongPress={() => {
+                haptics.tap();
+                setActionsBook(item);
+              }}
+            >
+              <BookCover book={item} width={tileWidth} />
+              <Text style={styles.tileTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <View style={styles.tileFooter}>
+                <Text
+                  style={[
+                    styles.tileStatus,
+                    item.finishedAt && { color: palette.success },
+                  ]}
+                >
+                  {statusLine(item)}
+                </Text>
+                <TouchableOpacity
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => setActionsBook(item)}
+                >
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={16}
+                    color={palette.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+              {!item.finishedAt && item.currentPage > 1 ? (
+                <ProgressBar value={progressOf(item)} height={3} />
+              ) : null}
+            </Pressable>
+          )}
+        />
       )}
+
+      <BookActionsSheet
+        book={actionsBook}
+        onClose={() => setActionsBook(null)}
+        onRename={renameBook}
+        onToggleFinished={toggleFinished}
+        onRemove={removeBook}
+      />
+
+      <Celebration
+        visible={!!celebrate}
+        title={celebrate?.title ?? ""}
+        totalPages={celebrate?.totalPages ?? 0}
+        booksFinished={finishedCount}
+        onClose={() => setCelebrate(null)}
+      />
+
+      <SessionToast message={toast} onHide={() => setToast(null)} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: palette.lightBackground,
-  },
+  safeArea: { flex: 1, backgroundColor: palette.lightBackground },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
@@ -205,11 +389,19 @@ const styles = StyleSheet.create({
     color: palette.textPrimary,
     letterSpacing: -0.5,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: palette.textSecondary,
-    marginTop: 2,
+  headerSubtitle: { fontSize: 14, color: palette.textSecondary, marginTop: 2 },
+  streakChip: {
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: "#FFF4E5",
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    alignItems: "center",
+    justifyContent: "center",
   },
+  streakChipAtRisk: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
+  streakText: { fontSize: 15, fontWeight: "800", color: "#C2410C" },
   headerAddButton: {
     width: 44,
     height: 44,
@@ -223,77 +415,89 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
-  list: {
-    flex: 1,
+  hero: {
+    flexDirection: "row",
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.xl,
+    backgroundColor: palette.primary,
+    shadowColor: palette.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 6,
   },
-  listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+  heroBody: { flex: 1, marginLeft: spacing.md, justifyContent: "center" },
+  heroEyebrow: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 1,
   },
-  card: {
+  heroTitle: { fontSize: 18, fontWeight: "800", color: "#fff", marginTop: 2 },
+  heroMeta: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.85)",
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  heroGoal: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  heroGoalText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  heroPlay: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filters: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
     backgroundColor: palette.lightCard,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm + 4,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
     borderWidth: 1,
     borderColor: palette.lightBorder,
   },
-  thumb: {
-    width: 52,
-    height: 64,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
+  chipActive: {
+    backgroundColor: palette.textPrimary,
+    borderColor: palette.textPrimary,
   },
-  cardBody: {
-    flex: 1,
-    marginLeft: spacing.md,
-    marginRight: spacing.sm,
-  },
-  cardTitle: {
-    fontSize: 17,
+  chipText: { fontSize: 13, fontWeight: "600", color: palette.textSecondary },
+  chipTextActive: { color: "#fff" },
+  listContent: { paddingBottom: spacing.xl * 3 },
+  tileTitle: {
+    fontSize: 13,
     fontWeight: "700",
     color: palette.textPrimary,
+    marginTop: 8,
+    lineHeight: 17,
   },
-  cardMeta: {
-    fontSize: 13,
-    color: palette.textSecondary,
-    marginTop: 3,
-  },
-  cardDate: {
-    fontSize: 12,
-    color: palette.textSecondary,
-    opacity: 0.8,
-    marginTop: 2,
-  },
-  removeButton: {
-    padding: spacing.sm,
-    borderRadius: radius.pill,
-  },
-  addButton: {
+  tileFooter: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    marginTop: spacing.sm,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: palette.primary,
-    backgroundColor: palette.accentSoft,
+    justifyContent: "space-between",
+    marginTop: 3,
+    marginBottom: 5,
   },
-  addButtonText: {
-    color: palette.primary,
-    fontSize: 15,
-    fontWeight: "600",
+  tileStatus: { fontSize: 12, color: palette.textSecondary, fontWeight: "600" },
+  filterEmpty: {
+    textAlign: "center",
+    color: palette.textSecondary,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   emptyState: {
     flex: 1,
@@ -323,7 +527,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
     marginBottom: spacing.lg,
-    maxWidth: 280,
+    maxWidth: 300,
   },
   emptyButton: {
     flexDirection: "row",
@@ -339,9 +543,5 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
-  emptyButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  emptyButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

@@ -1,29 +1,24 @@
-import React from "react";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
+import React, { useMemo } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-
-import Colors from "../../constants/Colors";
-import { useColorScheme } from "../../hooks/useColorScheme";
-
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>["name"];
-  color: string;
-}) {
-  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
-}
+import { palette } from "../../constants/theme";
+import useStatsStore from "../../store/statsStore";
+import { computeStreaks } from "../../utils/stats";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const days = useStatsStore((s) => s.days);
+  const streak = useMemo(() => computeStreaks(days), [days]);
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-        tabBarInactiveTintColor: Colors[colorScheme ?? "light"].tabIconDefault,
+        tabBarActiveTintColor: palette.primary,
+        tabBarInactiveTintColor: "#94A3B8",
         headerShown: false,
         tabBarStyle: {
           borderTopWidth: 0,
           elevation: 0,
+          backgroundColor: palette.lightCard,
         },
       }}
     >
@@ -31,7 +26,22 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Library",
-          tabBarIcon: ({ color }) => <TabBarIcon name="book" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="library" size={size} color={color as string} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: "Stats",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flame" size={size} color={color as string} />
+          ),
+          // Nudge when the streak is about to break.
+          tabBarBadge:
+            streak.current > 0 && !streak.readToday ? "!" : undefined,
+          tabBarBadgeStyle: { backgroundColor: palette.warning },
         }}
       />
     </Tabs>

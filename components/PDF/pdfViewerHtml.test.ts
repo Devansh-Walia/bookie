@@ -38,7 +38,7 @@ describe("buildPdfViewerHtml", () => {
 
   it("safely JSON-encodes worker source containing quotes, backslashes, and newlines", () => {
     const trickyWorkerSource =
-      "self.onmessage = function (e) {\n  var s = \"quote'\\\\backslash\";\n};";
+      'self.onmessage = function (e) {\n  var s = "quote\'\\\\backslash";\n};';
 
     const html = buildPdfViewerHtml({
       pdfLibSource: "var pdfjsLib = {};",
@@ -77,5 +77,29 @@ describe("buildPdfViewerHtml", () => {
 
     expect(html).toContain("var computeRenderScale = (function");
     expect(html).toContain("computeRenderScale({");
+  });
+});
+
+describe("reader themes", () => {
+  const base = {
+    pdfLibSource: "",
+    pdfWorkerSource: "",
+    pdfUrl: "file:///books/example.pdf",
+    initialPage: 1,
+  };
+
+  it("applies the requested theme on <body> and exposes setTheme", () => {
+    const html = buildPdfViewerHtml({ ...base, theme: "sepia" });
+    expect(html).toContain('<body data-theme="sepia">');
+    expect(html).toContain("setTheme: function (name)");
+    expect(html).toContain('body[data-theme="night"]');
+  });
+
+  it("refuses unsafe theme values", () => {
+    const html = buildPdfViewerHtml({
+      ...base,
+      theme: '"><script>alert(1)</script>',
+    });
+    expect(html).toContain('<body data-theme="original">');
   });
 });

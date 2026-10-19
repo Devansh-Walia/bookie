@@ -395,6 +395,9 @@ export function buildViewerScript({
   window.__bookie = {
     jumpToPage: function (n) { jumpToPage(n); },
     setBookmarks: function (list) { bookmarks = list || []; updateBookmarkRibbon(); },
+    setTheme: function (name) {
+      if (typeof name === "string" && /^[a-z-]+$/.test(name)) document.body.setAttribute("data-theme", name);
+    },
     setHighlights: function (list) {
       highlights = list || [];
       var container = pageFrontEl.querySelector(".page-container");

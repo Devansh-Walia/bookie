@@ -1,144 +1,133 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system";
 import { Book, BookStore } from "../types";
+import { bookFile, coverFile, deleteQuietly } from "../utils/files";
+import { migrateBook } from "./migrations";
 
-function makeId(): string {
-  return (
-    Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
+export function makeId(): string {
+  return Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+}
+
+const now = () => new Date().toISOString();
+
+function patchBook(
+  books: Book[],
+  id: string,
+  patch: (book: Book) => Partial<Book>,
+): Book[] {
+  return books.map((book) =>
+    book.id === id ? { ...book, ...patch(book) } : book,
   );
 }
 
 const useBookStore = create<BookStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       books: [],
-      addBook: (book) =>
+      addBook: ({ title, fileName }) => {
+        const id = makeId();
+        const timestamp = now();
         set((state) => ({
           books: [
             ...state.books,
             {
-              ...book,
-              id: makeId(),
-              lastReadAt: new Date().toISOString(),
+              id,
+              title,
+              fileName,
+              currentPage: 1,
+              totalPages: 0,
+              lastReadAt: timestamp,
+              addedAt: timestamp,
+              coverStatus: "pending",
               bookmarks: [],
               highlights: [],
             },
           ],
+        }));
+        return id;
+      },
+      updateBook: (id, patch) =>
+        set((state) => ({ books: patchBook(state.books, id, () => patch) })),
+      renameBook: (id, title) =>
+        set((state) => ({
+          books: patchBook(state.books, id, () => ({
+            title: title.trim() || "Untitled",
+            titleCustomized: true,
+          })),
         })),
       updatePage: (id, page) =>
         set((state) => ({
-          books: state.books.map((book) =>
-            book.id === id
-              ? {
-                  ...book,
-                  currentPage: page,
-                  lastReadAt: new Date().toISOString(),
-                }
-              : book
-          ),
+          books: patchBook(state.books, id, () => ({
+            currentPage: page,
+            lastReadAt: now(),
+          })),
         })),
       updateTotalPages: (id, totalPages) =>
         set((state) => ({
-          books: state.books.map((book) =>
-            book.id === id ? { ...book, totalPages } : book
-          ),
+          books: patchBook(state.books, id, () => ({ totalPages })),
+        })),
+      setFinished: (id, finished) =>
+        set((state) => ({
+          books: patchBook(state.books, id, () => ({
+            finishedAt: finished ? now() : undefined,
+          })),
         })),
       removeBook: (id) => {
-        set((state) => {
-          const bookToRemove = state.books.find((book) => book.id === id);
-          if (bookToRemove) {
-            // Delete the PDF file
-            FileSystem.deleteAsync(bookToRemove.filePath, {
-              idempotent: true,
-            }).catch((error) => console.error("Error deleting file:", error));
-          }
-          return {
-            books: state.books.filter((book) => book.id !== id),
-          };
-        });
+        const book = get().books.find((b) => b.id === id);
+        if (book) {
+          deleteQuietly(bookFile(book.fileName));
+          if (book.coverFileName) deleteQuietly(coverFile(book.coverFileName));
+        }
+        set((state) => ({ books: state.books.filter((b) => b.id !== id) }));
       },
       addBookmark: (bookId, bookmark) =>
         set((state) => ({
-          books: state.books.map((book) =>
-            book.id === bookId
-              ? {
-                  ...book,
-                  bookmarks: [
-                    ...(book.bookmarks ?? []),
-                    {
-                      ...bookmark,
-                      id: makeId(),
-                      createdAt: new Date().toISOString(),
-                    },
-                  ],
-                }
-              : book
-          ),
+          books: patchBook(state.books, bookId, (book) => ({
+            bookmarks: [
+              ...(book.bookmarks ?? []),
+              { ...bookmark, id: makeId(), createdAt: now() },
+            ],
+          })),
         })),
       removeBookmark: (bookId, bookmarkId) =>
         set((state) => ({
-          books: state.books.map((book) =>
-            book.id === bookId
-              ? {
-                  ...book,
-                  bookmarks: (book.bookmarks ?? []).filter(
-                    (b) => b.id !== bookmarkId
-                  ),
-                }
-              : book
-          ),
+          books: patchBook(state.books, bookId, (book) => ({
+            bookmarks: (book.bookmarks ?? []).filter(
+              (b) => b.id !== bookmarkId,
+            ),
+          })),
         })),
       addHighlight: (bookId, highlight) =>
         set((state) => ({
-          books: state.books.map((book) =>
-            book.id === bookId
-              ? {
-                  ...book,
-                  highlights: [
-                    ...(book.highlights ?? []),
-                    {
-                      ...highlight,
-                      id: makeId(),
-                      createdAt: new Date().toISOString(),
-                    },
-                  ],
-                }
-              : book
-          ),
+          books: patchBook(state.books, bookId, (book) => ({
+            highlights: [
+              ...(book.highlights ?? []),
+              { ...highlight, id: makeId(), createdAt: now() },
+            ],
+          })),
         })),
       removeHighlight: (bookId, highlightId) =>
         set((state) => ({
-          books: state.books.map((book) =>
-            book.id === bookId
-              ? {
-                  ...book,
-                  highlights: (book.highlights ?? []).filter(
-                    (h) => h.id !== highlightId
-                  ),
-                }
-              : book
-          ),
+          books: patchBook(state.books, bookId, (book) => ({
+            highlights: (book.highlights ?? []).filter(
+              (h) => h.id !== highlightId,
+            ),
+          })),
         })),
     }),
     {
       name: "book-storage",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
-      migrate: (persistedState: any) => {
-        // Ensure books added before bookmarks/highlights existed get defaults.
-        const books = Array.isArray(persistedState?.books)
-          ? persistedState.books.map((book: any) => ({
-              ...book,
-              bookmarks: book.bookmarks ?? [],
-              highlights: book.highlights ?? [],
-            }))
-          : [];
-        return { ...persistedState, books };
-      },
-    }
-  )
+      version: 2,
+      migrate: (persistedState: any) => ({
+        ...persistedState,
+        books: Array.isArray(persistedState?.books)
+          ? persistedState.books.map(migrateBook)
+          : [],
+      }),
+    },
+  ),
 );
 
 export default useBookStore;
