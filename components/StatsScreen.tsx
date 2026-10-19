@@ -10,7 +10,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import useStatsStore from "../store/statsStore";
 import useBookStore from "../store/bookStore";
-import { palette, radius, spacing } from "../constants/theme";
+import type { AppColors } from "../constants/theme";
+import { radius, spacing } from "../constants/theme";
+import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
 import { ProgressBar } from "./BookCover";
 import { haptics } from "../utils/haptics";
 import {
@@ -23,7 +25,6 @@ import {
   totals as computeTotals,
 } from "../utils/stats";
 
-const HEAT_COLORS = ["#E8EAF0", "#C7D2FE", "#A5B4FC", "#818CF8", "#4F46E5"];
 const HEAT_WEEKS = 17;
 const GOAL_STEPS = [5, 10, 15, 20, 30, 50, 75, 100];
 
@@ -35,6 +36,8 @@ function nextGoal(goal: number, dir: 1 | -1): number {
 }
 
 export default function StatsScreen() {
+  const c = useAppColors();
+  const styles = useThemedStyles(makeStyles);
   const days = useStatsStore((s) => s.days);
   const dailyGoal = useStatsStore((s) => s.dailyGoal);
   const setDailyGoal = useStatsStore((s) => s.setDailyGoal);
@@ -123,14 +126,14 @@ export default function StatsScreen() {
                 style={styles.goalBtn}
                 onPress={() => changeGoal(-1)}
               >
-                <Ionicons name="remove" size={16} color={palette.primary} />
+                <Ionicons name="remove" size={16} color={c.primary} />
               </TouchableOpacity>
               <Text style={styles.goalValue}>{dailyGoal} pages</Text>
               <TouchableOpacity
                 style={styles.goalBtn}
                 onPress={() => changeGoal(1)}
               >
-                <Ionicons name="add" size={16} color={palette.primary} />
+                <Ionicons name="add" size={16} color={c.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -141,7 +144,7 @@ export default function StatsScreen() {
           </View>
           <ProgressBar
             value={today.pages / dailyGoal}
-            color={today.pages >= dailyGoal ? palette.success : palette.primary}
+            color={today.pages >= dailyGoal ? c.success : c.primary}
             height={8}
           />
           {today.pages >= dailyGoal ? (
@@ -179,10 +182,10 @@ export default function StatsScreen() {
                       height: Math.max(4, (d.pages / maxWeek) * CHART_HEIGHT),
                       backgroundColor:
                         d.pages >= dailyGoal
-                          ? palette.success
+                          ? c.success
                           : d.pages > 0
-                            ? palette.primary
-                            : palette.lightBorder,
+                            ? c.primary
+                            : c.track,
                     },
                   ]}
                 />
@@ -213,7 +216,7 @@ export default function StatsScreen() {
                       {
                         backgroundColor: cell.future
                           ? "transparent"
-                          : HEAT_COLORS[cell.level],
+                          : c.heat[cell.level],
                       },
                     ]}
                   />
@@ -223,8 +226,11 @@ export default function StatsScreen() {
           </View>
           <View style={styles.legend}>
             <Text style={styles.legendText}>Less</Text>
-            {HEAT_COLORS.map((c) => (
-              <View key={c} style={[styles.heatCell, { backgroundColor: c }]} />
+            {c.heat.map((color, i) => (
+              <View
+                key={i}
+                style={[styles.heatCell, { backgroundColor: color }]}
+              />
             ))}
             <Text style={styles.legendText}>More</Text>
           </View>
@@ -319,6 +325,7 @@ function Total({
   value: string;
   label: string;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.total}>
       <Text style={styles.totalIcon}>{icon}</Text>
@@ -330,205 +337,206 @@ function Total({
 
 const CHART_HEIGHT = 110;
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: palette.lightBackground },
-  content: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl * 2,
-    gap: spacing.md,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: palette.textPrimary,
-    letterSpacing: -0.5,
-  },
-  card: {
-    backgroundColor: palette.lightCard,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: palette.lightBorder,
-  },
-  rowBetween: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: palette.textPrimary },
-  cardMeta: { fontSize: 12, color: palette.textSecondary, fontWeight: "600" },
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: c.background },
+    content: {
+      padding: spacing.lg,
+      paddingBottom: spacing.xl * 2,
+      gap: spacing.md,
+    },
+    title: {
+      fontSize: 30,
+      fontWeight: "800",
+      color: c.text,
+      letterSpacing: -0.5,
+    },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    rowBetween: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    cardTitle: { fontSize: 16, fontWeight: "700", color: c.text },
+    cardMeta: { fontSize: 12, color: c.textSecondary, fontWeight: "600" },
 
-  streakCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: "#FFF7ED",
-    borderColor: "#FED7AA",
-  },
-  streakEmoji: { fontSize: 44 },
-  streakValue: { fontSize: 26, fontWeight: "800", color: "#9A3412" },
-  streakLabel: { fontSize: 13, color: "#C2410C", marginTop: 2 },
-  bestPill: {
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  bestLabel: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#C2410C",
-    letterSpacing: 1,
-  },
-  bestValue: { fontSize: 20, fontWeight: "800", color: "#9A3412" },
+    streakCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      backgroundColor: c.streakBg,
+      borderColor: c.streakBorder,
+    },
+    streakEmoji: { fontSize: 44 },
+    streakValue: { fontSize: 26, fontWeight: "800", color: c.streakTextStrong },
+    streakLabel: { fontSize: 13, color: c.streakText, marginTop: 2 },
+    bestPill: {
+      alignItems: "center",
+      backgroundColor: c.streakPill,
+      borderRadius: radius.md,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    bestLabel: {
+      fontSize: 10,
+      fontWeight: "800",
+      color: c.streakText,
+      letterSpacing: 1,
+    },
+    bestValue: { fontSize: 20, fontWeight: "800", color: c.streakTextStrong },
 
-  goalAdjust: { flexDirection: "row", alignItems: "center", gap: 8 },
-  goalBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: palette.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  goalValue: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: palette.textPrimary,
-    minWidth: 64,
-    textAlign: "center",
-  },
-  goalNumbers: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  goalBig: { fontSize: 40, fontWeight: "800", color: palette.textPrimary },
-  goalOf: {
-    fontSize: 15,
-    color: palette.textSecondary,
-    marginLeft: 6,
-    flex: 1,
-  },
-  goalTime: { fontSize: 14, color: palette.textSecondary, fontWeight: "600" },
-  goalDone: {
-    marginTop: spacing.sm,
-    fontSize: 13,
-    color: palette.success,
-    fontWeight: "600",
-  },
+    goalAdjust: { flexDirection: "row", alignItems: "center", gap: 8 },
+    goalBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.accentSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    goalValue: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: c.text,
+      minWidth: 64,
+      textAlign: "center",
+    },
+    goalNumbers: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      marginTop: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    goalBig: { fontSize: 40, fontWeight: "800", color: c.text },
+    goalOf: {
+      fontSize: 15,
+      color: c.textSecondary,
+      marginLeft: 6,
+      flex: 1,
+    },
+    goalTime: { fontSize: 14, color: c.textSecondary, fontWeight: "600" },
+    goalDone: {
+      marginTop: spacing.sm,
+      fontSize: 13,
+      color: c.success,
+      fontWeight: "600",
+    },
 
-  chart: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    height: CHART_HEIGHT + 40,
-    marginTop: spacing.md,
-  },
-  goalLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    borderTopWidth: 1,
-    borderStyle: "dashed",
-    borderColor: palette.success,
-    opacity: 0.6,
-  },
-  barCol: { flex: 1, alignItems: "center" },
-  barValue: {
-    fontSize: 10,
-    color: palette.textSecondary,
-    marginBottom: 2,
-    height: 13,
-  },
-  bar: { width: 22, borderRadius: 6 },
-  barLabel: {
-    fontSize: 12,
-    color: palette.textSecondary,
-    marginTop: 4,
-    height: 14,
-  },
-  barLabelToday: { color: palette.primary, fontWeight: "800" },
+    chart: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+      height: CHART_HEIGHT + 40,
+      marginTop: spacing.md,
+    },
+    goalLine: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      borderTopWidth: 1,
+      borderStyle: "dashed",
+      borderColor: c.success,
+      opacity: 0.6,
+    },
+    barCol: { flex: 1, alignItems: "center" },
+    barValue: {
+      fontSize: 10,
+      color: c.textSecondary,
+      marginBottom: 2,
+      height: 13,
+    },
+    bar: { width: 22, borderRadius: 6 },
+    barLabel: {
+      fontSize: 12,
+      color: c.textSecondary,
+      marginTop: 4,
+      height: 14,
+    },
+    barLabelToday: { color: c.primary, fontWeight: "800" },
 
-  heatmap: {
-    flexDirection: "row",
-    gap: 3,
-    marginTop: spacing.md,
-    justifyContent: "center",
-  },
-  heatCol: { gap: 3 },
-  heatCell: { width: 14, height: 14, borderRadius: 3 },
-  legend: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    justifyContent: "flex-end",
-    marginTop: spacing.sm,
-  },
-  legendText: {
-    fontSize: 11,
-    color: palette.textSecondary,
-    marginHorizontal: 4,
-  },
+    heatmap: {
+      flexDirection: "row",
+      gap: 3,
+      marginTop: spacing.md,
+      justifyContent: "center",
+    },
+    heatCol: { gap: 3 },
+    heatCell: { width: 14, height: 14, borderRadius: 3 },
+    legend: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      justifyContent: "flex-end",
+      marginTop: spacing.sm,
+    },
+    legendText: {
+      fontSize: 11,
+      color: c.textSecondary,
+      marginHorizontal: 4,
+    },
 
-  totals: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  total: {
-    flexBasis: "47%",
-    flexGrow: 1,
-    backgroundColor: palette.lightCard,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: palette.lightBorder,
-  },
-  totalIcon: { fontSize: 22 },
-  totalValue: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: palette.textPrimary,
-    marginTop: 6,
-  },
-  totalLabel: { fontSize: 12, color: palette.textSecondary, marginTop: 2 },
+    totals: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+    total: {
+      flexBasis: "47%",
+      flexGrow: 1,
+      backgroundColor: c.card,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    totalIcon: { fontSize: 22 },
+    totalValue: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: c.text,
+      marginTop: 6,
+    },
+    totalLabel: { fontSize: 12, color: c.textSecondary, marginTop: 2 },
 
-  badges: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  badge: {
-    width: "31%",
-    alignItems: "center",
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: palette.accentSoft,
-  },
-  badgeLocked: { backgroundColor: palette.lightBackground },
-  badgeIcon: { fontSize: 28 },
-  badgeTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: palette.textPrimary,
-    marginTop: 4,
-  },
-  badgeDesc: {
-    fontSize: 10,
-    color: palette.textSecondary,
-    textAlign: "center",
-    marginTop: 2,
-  },
+    badges: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      rowGap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    badge: {
+      width: "31%",
+      alignItems: "center",
+      padding: spacing.sm,
+      borderRadius: radius.md,
+      backgroundColor: c.accentSoft,
+    },
+    badgeLocked: { backgroundColor: c.background },
+    badgeIcon: { fontSize: 28 },
+    badgeTitle: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: c.text,
+      marginTop: 4,
+    },
+    badgeDesc: {
+      fontSize: 10,
+      color: c.textSecondary,
+      textAlign: "center",
+      marginTop: 2,
+    },
 
-  finishedRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.lightBorder,
-  },
-  finishedTitle: { flex: 1, fontSize: 14, color: palette.textPrimary },
-});
+    finishedRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 8,
+      gap: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.border,
+    },
+    finishedTitle: { flex: 1, fontSize: 14, color: c.text },
+  });

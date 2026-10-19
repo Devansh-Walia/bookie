@@ -83,3 +83,6 @@ export interface FinishedEntry {
 }
 
 export type ReaderTheme = "original" | "sepia" | "night" | "candlelight";
+
+/** App-wide appearance. "system" follows the OS setting. */
+export type AppThemeMode = "system" | "light" | "dark";

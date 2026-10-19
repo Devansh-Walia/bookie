@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text } from "react-native";
-import { palette, radius, spacing } from "../constants/theme";
+import type { AppColors } from "../constants/theme";
+import { radius, spacing } from "../constants/theme";
+import { useThemedStyles } from "../hooks/useAppTheme";
 
 export interface ToastMessage {
   id: number;
@@ -16,6 +18,7 @@ export function SessionToast({
   message: ToastMessage | null;
   onHide: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -62,22 +65,23 @@ export function SessionToast({
   );
 }
 
-const styles = StyleSheet.create({
-  toast: {
-    position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: spacing.lg,
-    backgroundColor: palette.textPrimary,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  title: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  subtitle: { color: palette.textOnDarkMuted, fontSize: 13, marginTop: 2 },
-});
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    toast: {
+      position: "absolute",
+      left: spacing.lg,
+      right: spacing.lg,
+      bottom: spacing.lg,
+      backgroundColor: c.inverse,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    title: { color: c.onInverse, fontSize: 16, fontWeight: "700" },
+    subtitle: { color: c.onInverseMuted, fontSize: 13, marginTop: 2 },
+  });

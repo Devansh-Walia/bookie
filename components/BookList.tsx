@@ -17,7 +17,9 @@ import useStatsStore from "../store/statsStore";
 import { Book } from "../types";
 import PDFViewer from "./PDF/PDFViewer";
 import { useBookActions } from "../hooks/useBookActions";
-import { palette, radius, spacing } from "../constants/theme";
+import type { AppColors } from "../constants/theme";
+import { radius, spacing } from "../constants/theme";
+import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
 import { BookCover, ProgressBar, progressOf } from "./BookCover";
 import { BookActionsSheet } from "./BookActionsSheet";
 import { SessionToast, ToastMessage } from "./SessionToast";
@@ -63,6 +65,8 @@ function statusLine(book: Book): string {
 }
 
 export default function BookList() {
+  const c = useAppColors();
+  const styles = useThemedStyles(makeStyles);
   const router = useRouter();
   const { width } = useWindowDimensions();
   const books = useBookStore((s) => s.books);
@@ -99,18 +103,18 @@ export default function BookList() {
     [sorted, filter],
   );
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = {
+    const cnt: Record<Filter, number> = {
       all: books.length,
       reading: 0,
       unread: 0,
       finished: 0,
     };
     for (const b of books) {
-      if (matchesFilter(b, "reading")) c.reading++;
-      else if (matchesFilter(b, "unread")) c.unread++;
-      else if (matchesFilter(b, "finished")) c.finished++;
+      if (matchesFilter(b, "reading")) cnt.reading++;
+      else if (matchesFilter(b, "unread")) cnt.unread++;
+      else if (matchesFilter(b, "finished")) cnt.finished++;
     }
-    return c;
+    return cnt;
   }, [books]);
 
   const tileWidth = Math.floor(
@@ -224,7 +228,7 @@ export default function BookList() {
                   : `Today ${todayPages}/${dailyGoal} pages`}
               </Text>
               <View style={styles.heroPlay}>
-                <Ionicons name="play" size={14} color={palette.primary} />
+                <Ionicons name="play" size={14} color={c.primary} />
               </View>
             </View>
           </View>
@@ -274,11 +278,7 @@ export default function BookList() {
           {header}
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <Ionicons
-                name="library-outline"
-                size={44}
-                color={palette.primary}
-              />
+              <Ionicons name="library-outline" size={44} color={c.primary} />
             </View>
             <Text style={styles.emptyTitle}>Start your collection</Text>
             <Text style={styles.emptyText}>
@@ -328,7 +328,7 @@ export default function BookList() {
                 <Text
                   style={[
                     styles.tileStatus,
-                    item.finishedAt && { color: palette.success },
+                    item.finishedAt && { color: c.success },
                   ]}
                 >
                   {statusLine(item)}
@@ -340,7 +340,7 @@ export default function BookList() {
                   <Ionicons
                     name="ellipsis-horizontal"
                     size={16}
-                    color={palette.textSecondary}
+                    color={c.textSecondary}
                   />
                 </TouchableOpacity>
               </View>
@@ -373,175 +373,179 @@ export default function BookList() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: palette.lightBackground },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: palette.textPrimary,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: { fontSize: 14, color: palette.textSecondary, marginTop: 2 },
-  streakChip: {
-    height: 40,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: "#FFF4E5",
-    borderWidth: 1,
-    borderColor: "#FED7AA",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  streakChipAtRisk: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
-  streakText: { fontSize: 15, fontWeight: "800", color: "#C2410C" },
-  headerAddButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: palette.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: palette.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  hero: {
-    flexDirection: "row",
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.xl,
-    backgroundColor: palette.primary,
-    shadowColor: palette.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  heroBody: { flex: 1, marginLeft: spacing.md, justifyContent: "center" },
-  heroEyebrow: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 1,
-  },
-  heroTitle: { fontSize: 18, fontWeight: "800", color: "#fff", marginTop: 2 },
-  heroMeta: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.85)",
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  heroGoal: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  heroGoalText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-  heroPlay: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filters: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-    backgroundColor: palette.lightCard,
-    borderWidth: 1,
-    borderColor: palette.lightBorder,
-  },
-  chipActive: {
-    backgroundColor: palette.textPrimary,
-    borderColor: palette.textPrimary,
-  },
-  chipText: { fontSize: 13, fontWeight: "600", color: palette.textSecondary },
-  chipTextActive: { color: "#fff" },
-  listContent: { paddingBottom: spacing.xl * 3 },
-  tileTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: palette.textPrimary,
-    marginTop: 8,
-    lineHeight: 17,
-  },
-  tileFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 3,
-    marginBottom: 5,
-  },
-  tileStatus: { fontSize: 12, color: palette.textSecondary, fontWeight: "600" },
-  filterEmpty: {
-    textAlign: "center",
-    color: palette.textSecondary,
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl * 2,
-  },
-  emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: palette.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.lg,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: palette.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: palette.textSecondary,
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: spacing.lg,
-    maxWidth: 300,
-  },
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: radius.pill,
-    backgroundColor: palette.primary,
-    shadowColor: palette.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  emptyButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-});
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: c.background },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
+    },
+    headerTitle: {
+      fontSize: 30,
+      fontWeight: "800",
+      color: c.text,
+      letterSpacing: -0.5,
+    },
+    headerSubtitle: { fontSize: 14, color: c.textSecondary, marginTop: 2 },
+    streakChip: {
+      height: 40,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      backgroundColor: c.streakBg,
+      borderWidth: 1,
+      borderColor: c.streakBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    streakChipAtRisk: {
+      backgroundColor: c.streakRiskBg,
+      borderColor: c.streakRiskBorder,
+    },
+    streakText: { fontSize: 15, fontWeight: "800", color: c.streakText },
+    headerAddButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: c.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: c.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      elevation: 5,
+    },
+    hero: {
+      flexDirection: "row",
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      padding: spacing.md,
+      borderRadius: radius.xl,
+      backgroundColor: c.primary,
+      shadowColor: c.primary,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      elevation: 6,
+    },
+    heroBody: { flex: 1, marginLeft: spacing.md, justifyContent: "center" },
+    heroEyebrow: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: "rgba(255,255,255,0.7)",
+      letterSpacing: 1,
+    },
+    heroTitle: { fontSize: 18, fontWeight: "800", color: "#fff", marginTop: 2 },
+    heroMeta: {
+      fontSize: 13,
+      color: "rgba(255,255,255,0.85)",
+      marginTop: 4,
+      marginBottom: 8,
+    },
+    heroGoal: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 10,
+    },
+    heroGoalText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+    heroPlay: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "#fff",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    filters: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: radius.pill,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    chipActive: {
+      backgroundColor: c.inverse,
+      borderColor: c.inverse,
+    },
+    chipText: { fontSize: 13, fontWeight: "600", color: c.textSecondary },
+    chipTextActive: { color: c.onInverse },
+    listContent: { paddingBottom: spacing.xl * 3 },
+    tileTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: c.text,
+      marginTop: 8,
+      lineHeight: 17,
+    },
+    tileFooter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 3,
+      marginBottom: 5,
+    },
+    tileStatus: { fontSize: 12, color: c.textSecondary, fontWeight: "600" },
+    filterEmpty: {
+      textAlign: "center",
+      color: c.textSecondary,
+      marginTop: spacing.xl,
+      paddingHorizontal: spacing.lg,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl * 2,
+    },
+    emptyIcon: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: c.accentSoft,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: spacing.lg,
+    },
+    emptyTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: c.text,
+      marginBottom: spacing.sm,
+    },
+    emptyText: {
+      fontSize: 15,
+      color: c.textSecondary,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: spacing.lg,
+      maxWidth: 300,
+    },
+    emptyButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 24,
+      borderRadius: radius.pill,
+      backgroundColor: c.primary,
+      shadowColor: c.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      elevation: 5,
+    },
+    emptyButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  });

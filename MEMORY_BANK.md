@@ -18,7 +18,16 @@
     covers, finished state, bookmarks, highlights.
   - `statsStore`: per-day `{pages, seconds}` log, finished history, daily goal,
     night-owl/early-bird flags.
-  - `settingsStore`: reader theme, haptics.
+  - `settingsStore`: app theme (`system`/`light`/`dark`), reader theme, haptics.
+- **App theme (light/dark):** tokens are `lightColors`/`darkColors` (`AppColors`)
+  in `constants/theme.ts`. Components use `useAppColors()` and
+  `useThemedStyles(makeStyles)` from `hooks/useAppTheme.ts`, with a module-level
+  `makeStyles = (c: AppColors) => StyleSheet.create(...)`. Don't use
+  `palette.light*`/`palette.textPrimary` in library UI. The root layout calls
+  `useApplyAppearance()` (`Appearance.setColorScheme`) and themes the
+  navigation, status bar and system UI background. Users pick the mode in the
+  Settings tab (`components/SettingsScreen.tsx`). The reader keeps its own
+  palette.
 - **Covers:** `components/CoverGenerator.tsx` (mounted in the root layout)
   renders page 1 of each `coverStatus: "pending"` book in an invisible WebView
   (`components/PDF/coverHtml.ts`). It also fills in `totalPages` and a title

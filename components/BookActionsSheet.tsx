@@ -13,7 +13,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Book } from "../types";
-import { palette, radius, spacing } from "../constants/theme";
+import type { AppColors } from "../constants/theme";
+import { radius, spacing } from "../constants/theme";
+import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
 import { BookCover, progressOf } from "./BookCover";
 
 interface Props {
@@ -32,6 +34,8 @@ export function BookActionsSheet({
   onToggleFinished,
   onRemove,
 }: Props) {
+  const c = useAppColors();
+  const styles = useThemedStyles(makeStyles);
   const [title, setTitle] = useState("");
 
   useEffect(() => {
@@ -88,6 +92,8 @@ export function BookActionsSheet({
                   style={styles.input}
                   returnKeyType="done"
                   selectTextOnFocus
+                  keyboardAppearance={c.scheme}
+                  placeholderTextColor={c.textMuted}
                 />
                 <Text style={styles.meta}>
                   {book.totalPages
@@ -108,15 +114,15 @@ export function BookActionsSheet({
               <Ionicons
                 name={book.finishedAt ? "refresh" : "checkmark-done"}
                 size={20}
-                color={palette.primary}
+                color={c.primary}
               />
               <Text style={styles.actionText}>
                 {book.finishedAt ? "Mark as not finished" : "Mark as finished"}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.action} onPress={confirmRemove}>
-              <Ionicons name="trash-outline" size={20} color={palette.danger} />
-              <Text style={[styles.actionText, { color: palette.danger }]}>
+              <Ionicons name="trash-outline" size={20} color={c.danger} />
+              <Text style={[styles.actionText, { color: c.danger }]}>
                 Remove from library
               </Text>
             </TouchableOpacity>
@@ -127,57 +133,58 @@ export function BookActionsSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15,23,42,0.45)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: palette.lightCard,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xl + 8,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: palette.lightBorder,
-    marginBottom: spacing.md,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: spacing.md,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: palette.textSecondary,
-    marginBottom: 4,
-  },
-  input: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: palette.textPrimary,
-    borderWidth: 1,
-    borderColor: palette.lightBorder,
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: palette.lightBackground,
-  },
-  meta: { fontSize: 12, color: palette.textSecondary, marginTop: 6 },
-  action: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: palette.lightBorder,
-  },
-  actionText: { fontSize: 16, fontWeight: "600", color: palette.textPrimary },
-});
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: c.backdrop,
+      justifyContent: "flex-end",
+    },
+    sheet: {
+      backgroundColor: c.card,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      padding: spacing.lg,
+      paddingBottom: spacing.xl + 8,
+    },
+    handle: {
+      alignSelf: "center",
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.border,
+      marginBottom: spacing.md,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: spacing.md,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: c.textSecondary,
+      marginBottom: 4,
+    },
+    input: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: c.text,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.sm,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: c.background,
+    },
+    meta: { fontSize: 12, color: c.textSecondary, marginTop: 6 },
+    action: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 14,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
+    actionText: { fontSize: 16, fontWeight: "600", color: c.text },
+  });

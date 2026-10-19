@@ -1,6 +1,8 @@
 import React from "react";
 import { Image, StyleSheet, Text, View, ViewStyle } from "react-native";
 import type { Book } from "../types";
+import type { AppColors } from "../constants/theme";
+import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
 import { coverFile } from "../utils/files";
 
 const ACCENTS = [
@@ -33,6 +35,7 @@ interface Props {
 
 /** Book cover: the rendered first page, or a generated "cloth" cover. */
 export function BookCover({ book, width, style }: Props) {
+  const styles = useThemedStyles(makeStyles);
   const height = Math.round(width * 1.4);
   const radius = Math.max(4, Math.round(width * 0.05));
   const frame = { width, height, borderRadius: radius };
@@ -85,6 +88,7 @@ export function BookCover({ book, width, style }: Props) {
 }
 
 function FinishedRibbon({ size }: { size: number }) {
+  const styles = useThemedStyles(makeStyles);
   const badge = Math.max(18, Math.round(size * 0.22));
   return (
     <View
@@ -110,13 +114,15 @@ function FinishedRibbon({ size }: { size: number }) {
 
 export function ProgressBar({
   value,
-  color = "#6366F1",
+  color,
   height = 4,
 }: {
   value: number;
   color?: string;
   height?: number;
 }) {
+  const c = useAppColors();
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.track, { height, borderRadius: height / 2 }]}>
       <View
@@ -124,55 +130,61 @@ export function ProgressBar({
           width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`,
           height,
           borderRadius: height / 2,
-          backgroundColor: color,
+          backgroundColor: color ?? c.primary,
         }}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  shadow: {
-    backgroundColor: "#E2E8F0",
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  image: { backgroundColor: "#fff" },
-  spine: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 6,
-    backgroundColor: "rgba(0,0,0,0.12)",
-  },
-  placeholderInner: {
-    flex: 1,
-    margin: 6,
-    marginLeft: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    padding: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  placeholderTitle: {
-    color: "#fff",
-    fontWeight: "800",
-    textAlign: "center",
-    letterSpacing: 0.2,
-  },
-  placeholderHint: { position: "absolute", bottom: 6, right: 6, fontSize: 12 },
-  finished: {
-    position: "absolute",
-    backgroundColor: "#10B981",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  track: { width: "100%", backgroundColor: "#E2E8F0", overflow: "hidden" },
-});
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    shadow: {
+      backgroundColor: c.coverPlaceholder,
+      shadowColor: "#0F172A",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    image: { backgroundColor: "#fff" },
+    spine: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 6,
+      backgroundColor: "rgba(0,0,0,0.12)",
+    },
+    placeholderInner: {
+      flex: 1,
+      margin: 6,
+      marginLeft: 12,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.35)",
+      padding: 8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    placeholderTitle: {
+      color: "#fff",
+      fontWeight: "800",
+      textAlign: "center",
+      letterSpacing: 0.2,
+    },
+    placeholderHint: {
+      position: "absolute",
+      bottom: 6,
+      right: 6,
+      fontSize: 12,
+    },
+    finished: {
+      position: "absolute",
+      backgroundColor: "#10B981",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: "#fff",
+    },
+    track: { width: "100%", backgroundColor: c.track, overflow: "hidden" },
+  });

@@ -1,8 +1,10 @@
 import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
-import { palette } from "@/constants/theme";
+import type { AppColors } from "@/constants/theme";
+import { useThemedStyles } from "@/hooks/useAppTheme";
 
 export default function NotFoundScreen() {
+  const styles = useThemedStyles(makeStyles);
   return (
     <>
       <Stack.Screen options={{ title: "Oops!" }} />
@@ -16,15 +18,16 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: palette.lightBackground,
-  },
-  title: { fontSize: 20, fontWeight: "bold", color: palette.textPrimary },
-  link: { marginTop: 15, paddingVertical: 15 },
-  linkText: { fontSize: 14, color: palette.primary },
-});
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+      backgroundColor: c.background,
+    },
+    title: { fontSize: 20, fontWeight: "bold", color: c.text },
+    link: { marginTop: 15, paddingVertical: 15 },
+    linkText: { fontSize: 14, color: c.primary },
+  });

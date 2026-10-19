@@ -4,9 +4,11 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
 
-import { customLightTheme } from "@/constants/theme";
+import { customDarkTheme, customLightTheme } from "@/constants/theme";
+import { useAppColors, useApplyAppearance } from "@/hooks/useAppTheme";
 import CoverGenerator from "@/components/CoverGenerator";
 
 export {
@@ -23,6 +25,12 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts(Ionicons.font);
+  const colors = useAppColors();
+  useApplyAppearance();
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
+  }, [colors.background]);
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
@@ -35,11 +43,11 @@ export default function RootLayout() {
 
   if (!loaded) return null;
 
-  // The library UI is designed for a light surface (the reader has its own
-  // dark/themed chrome), so we keep the navigation theme light.
+  // The reader has its own themed chrome; the library follows the app theme.
+  const dark = colors.scheme === "dark";
   return (
-    <ThemeProvider value={customLightTheme}>
-      <StatusBar style="dark" />
+    <ThemeProvider value={dark ? customDarkTheme : customLightTheme}>
+      <StatusBar style={dark ? "light" : "dark"} />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>

@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { palette, radius, spacing } from "../constants/theme";
+import type { AppColors } from "../constants/theme";
+import { radius, spacing } from "../constants/theme";
+import { useThemedStyles } from "../hooks/useAppTheme";
 
 const COLORS = [
   "#6366F1",
@@ -124,6 +126,7 @@ export function Celebration({
   booksFinished,
   onClose,
 }: CelebrationProps) {
+  const styles = useThemedStyles(makeStyles);
   const pop = useRef(new Animated.Value(0)).current;
   // New confetti burst each time the modal opens (but not on re-renders).
   const burstKey = useMemo(() => (visible ? Date.now() : 0), [visible]);
@@ -196,43 +199,44 @@ export function Celebration({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.75)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.lg,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 340,
-    backgroundColor: palette.lightCard,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    alignItems: "center",
-  },
-  trophy: { fontSize: 64, marginBottom: spacing.sm },
-  heading: { fontSize: 26, fontWeight: "800", color: palette.textPrimary },
-  bookTitle: {
-    fontSize: 16,
-    color: palette.textSecondary,
-    textAlign: "center",
-    marginTop: spacing.xs,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: spacing.lg,
-    marginVertical: spacing.lg,
-  },
-  stat: { alignItems: "center" },
-  statValue: { fontSize: 24, fontWeight: "800", color: palette.primary },
-  statLabel: { fontSize: 12, color: palette.textSecondary, marginTop: 2 },
-  button: {
-    backgroundColor: palette.primary,
-    borderRadius: radius.pill,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-  },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-});
+const makeStyles = (c: AppColors) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: spacing.lg,
+    },
+    card: {
+      width: "100%",
+      maxWidth: 340,
+      backgroundColor: c.card,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      alignItems: "center",
+    },
+    trophy: { fontSize: 64, marginBottom: spacing.sm },
+    heading: { fontSize: 26, fontWeight: "800", color: c.text },
+    bookTitle: {
+      fontSize: 16,
+      color: c.textSecondary,
+      textAlign: "center",
+      marginTop: spacing.xs,
+    },
+    statsRow: {
+      flexDirection: "row",
+      gap: spacing.lg,
+      marginVertical: spacing.lg,
+    },
+    stat: { alignItems: "center" },
+    statValue: { fontSize: 24, fontWeight: "800", color: c.primary },
+    statLabel: { fontSize: 12, color: c.textSecondary, marginTop: 2 },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: radius.pill,
+      paddingVertical: 14,
+      paddingHorizontal: 32,
+    },
+    buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  });
