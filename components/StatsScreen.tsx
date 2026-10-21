@@ -15,6 +15,10 @@ import { radius, spacing } from "../constants/theme";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
 import { ProgressBar } from "./BookCover";
 import { haptics } from "../utils/haptics";
+import { useFocusEffect } from "expo-router";
+import { useAppLockStatus } from "../hooks/useAppLock";
+import useAppLockStore from "../store/appLockStore";
+import { PASSES_PER_DAY } from "../utils/appLock";
 import {
   computeBadges,
   computeStreaks,
@@ -52,6 +56,9 @@ export default function StatsScreen() {
   const week = useMemo(() => lastNDays(days, 7), [days]);
   const heat = useMemo(() => heatmapWeeks(days, HEAT_WEEKS), [days]);
   const totals = useMemo(() => computeTotals(days), [days]);
+  const lockedApps = useAppLockStore((s) => s.apps.length);
+  const { cheats, refresh: refreshCheats } = useAppLockStatus();
+  useFocusEffect(refreshCheats);
   const badges = useMemo(
     () =>
       computeBadges({
@@ -259,6 +266,20 @@ export default function StatsScreen() {
             label="reading days"
           />
         </View>
+
+        {cheats && (lockedApps > 0 || cheats.total > 0) ? (
+          <View style={[styles.card, styles.rowBetween]}>
+            <View>
+              <Text style={styles.cardTitle}>App Lock cheats</Text>
+              <Text style={styles.cardMeta}>
+                {cheats.passesLeft}/{PASSES_PER_DAY} passes left today
+              </Text>
+            </View>
+            <Text style={styles.cardTitle}>
+              {cheats.today} today · {cheats.total} total
+            </Text>
+          </View>
+        ) : null}
 
         {/* Badges */}
         <View style={styles.card}>
