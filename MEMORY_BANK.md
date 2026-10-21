@@ -43,6 +43,20 @@
   via `window.__bookie.setTheme`.
 - **Fun bits:** confetti `Celebration` on reaching the last page, a session
   toast after closing the reader, and haptics (`utils/haptics.ts`).
+- **App Lock (Android only):** `modules/app-lock` is a local Expo module
+  (classic `ModuleDefinition` API) and is autolinked from `./modules`.
+  - `AppLockService` (AccessibilityService, window-state events only) opens
+    `BlockActivity` over locked apps.
+  - `LockPrefs` (SharedPreferences) stores the config pushed from JS, the
+    passes (3 a day, 5 minutes each) and the cheat history.
+  - Native treats a config with a stale `date` as 0 pages, which gives the
+    midnight reset.
+  - JS side: `store/appLockStore.ts` holds the tiers as increments, the apps
+    with a 0-based tier, and the re-lock penalty.
+  - The pure rules are in `utils/appLock.ts`.
+  - `hooks/useAppLock.ts` pushes the config after both stores have hydrated.
+  - The screen is `app/app-lock.tsx` (`components/AppLockScreen.tsx`).
+  - `AppLock` is `null` on iOS and web, so the UI hides itself there.
 - **Roadmap:** see `future.md` (monetization / Pro).
 
 ---
