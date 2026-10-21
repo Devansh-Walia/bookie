@@ -86,3 +86,11 @@ export type ReaderTheme = "original" | "sepia" | "night" | "candlelight";
 
 /** App-wide appearance. "system" follows the OS setting. */
 export type AppThemeMode = "system" | "light" | "dark";
+
+/** An app the user locked behind reading (Android only). */
+export interface LockedApp {
+  packageName: string;
+  label: string;
+  /** 0-based index into the tier list. */
+  tier: number;
+}
