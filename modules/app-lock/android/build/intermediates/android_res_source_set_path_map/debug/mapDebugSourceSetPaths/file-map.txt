@@ -1,0 +1,9 @@
+expo.modules.applock.app-lock-pngs-0 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/build/generated/res/pngs/debug
+expo.modules.applock.app-lock-updated_navigation_xml-1 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/build/generated/updated_navigation_xml/debug
+expo.modules.applock.app-lock-mergeDebugResources-2 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+expo.modules.applock.app-lock-mergeDebugResources-3 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+expo.modules.applock.app-lock-debug-4 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/build/intermediates/merged_res/debug/mergeDebugResources
+expo.modules.applock.app-lock-debug-5 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/build/intermediates/packaged_res/debug/packageDebugResources
+expo.modules.applock.app-lock-debug-6 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/debug/res
+expo.modules.applock.app-lock-main-7 /Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/res
+gradleHome-0 /Users/devanshwalia/.gradle

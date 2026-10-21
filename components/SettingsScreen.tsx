@@ -10,6 +10,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { router } from "expo-router";
+import { AppLock } from "../modules/app-lock";
+import useAppLockStore from "../store/appLockStore";
 import useSettingsStore from "../store/settingsStore";
 import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
@@ -37,6 +40,8 @@ export default function SettingsScreen() {
   const setReaderTheme = useSettingsStore((s) => s.setReaderTheme);
   const hapticsOn = useSettingsStore((s) => s.haptics);
   const setHaptics = useSettingsStore((s) => s.setHaptics);
+  const lockedCount = useAppLockStore((s) => s.apps.length);
+  const lockEnabled = useAppLockStore((s) => s.enabled);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -120,6 +125,24 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {AppLock ? (
+          <TouchableOpacity
+            style={[styles.card, styles.linkCard]}
+            onPress={() => router.push("/app-lock")}
+          >
+            <Ionicons name="lock-closed-outline" size={22} color={c.primary} />
+            <View style={styles.flex}>
+              <Text style={styles.cardTitle}>App Lock</Text>
+              <Text style={styles.caption}>
+                {lockedCount === 0
+                  ? "Read pages to unlock distracting apps."
+                  : `${lockedCount} app${lockedCount === 1 ? "" : "s"} locked${lockEnabled ? "" : " · paused"}`}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={c.textMuted} />
+          </TouchableOpacity>
+        ) : null}
+
         <Text style={styles.footer}>
           Bookie v{Constants.expoConfig?.version}
         </Text>
@@ -173,5 +196,7 @@ const makeStyles = (c: AppColors) =>
       justifyContent: "space-between",
       marginTop: spacing.sm,
     },
+    linkCard: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+    flex: { flex: 1 },
     footer: { textAlign: "center", color: c.textMuted, fontSize: 12 },
   });

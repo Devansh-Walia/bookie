@@ -1,0 +1,22 @@
+  <!-- soft shadow under the book -->
+  <ellipse cx="512" cy="742" rx="300" ry="34" fill="#1E1B4B" opacity="0.28" filter="url(#blur)"/>
+  <!-- page stack (thickness) -->
+  <path d="M196 330 Q354 288 506 340 L506 728 Q354 680 196 718 Z" fill="#C7D2FE"/>
+  <path d="M828 330 Q670 288 518 340 L518 728 Q670 680 828 718 Z" fill="#C7D2FE"/>
+  <!-- left page -->
+  <path d="M212 312 Q360 268 506 322 L506 708 Q360 660 212 700 Z" fill="url(#pageL)"/>
+  <!-- right page -->
+  <path d="M812 312 Q664 268 518 322 L518 708 Q664 660 812 700 Z" fill="url(#pageR)"/>
+  <!-- spine crease -->
+  <path d="M506 322 L506 708 L518 708 L518 322 Z" fill="#A5B4FC"/>
+  <!-- text lines -->
+  <g stroke="#A5B4FC" stroke-width="18" stroke-linecap="round" fill="none">
+    <path d="M262 378 Q352 352 450 380"/>
+    <path d="M262 438 Q352 412 450 440"/>
+    <path d="M262 498 Q352 472 450 500"/>
+    <path d="M262 558 Q330 540 400 556"/>
+  </g>
+  <!-- bookmark ribbon with keyhole -->
+  <path d="M618 282 L726 278 L726 548 L672 506 L618 548 Z" fill="url(#ribbon)"/>
+  <circle cx="672" cy="380" r="22" fill="#FFFFFF"/>
+  <path d="M662 392 L682 392 L690 446 L654 446 Z" fill="#FFFFFF"/>

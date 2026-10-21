@@ -1,0 +1,70 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="expo.modules.applock" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+5-->INJECTED
+5-->INJECTED
+6    <!-- Lets us list launchable apps without QUERY_ALL_PACKAGES. -->
+7    <queries>
+7-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:3:3-8:13
+8        <intent>
+8-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:4:5-7:14
+9            <action android:name="android.intent.action.MAIN" />
+9-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:5:7-59
+9-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:5:15-56
+10
+11            <category android:name="android.intent.category.LAUNCHER" />
+11-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:6:7-67
+11-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:6:17-64
+12        </intent>
+13    </queries>
+14
+15    <application>
+15-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:10:3-33:17
+16        <service
+16-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:11:5-22:15
+17            android:name="expo.modules.applock.AppLockService"
+17-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:12:7-57
+18            android:exported="true"
+18-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:13:7-30
+19            android:label="@string/app_lock_service_label"
+19-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:14:7-53
+20            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" >
+20-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:15:7-73
+21            <intent-filter>
+21-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:16:7-18:23
+22                <action android:name="android.accessibilityservice.AccessibilityService" />
+22-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:17:9-84
+22-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:17:17-81
+23            </intent-filter>
+24
+25            <meta-data
+25-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:19:7-21:52
+26                android:name="android.accessibilityservice"
+26-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:20:9-52
+27                android:resource="@xml/app_lock_service" />
+27-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:21:9-49
+28        </service>
+29
+30        <activity
+30-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:24:5-32:67
+31            android:name="expo.modules.applock.BlockActivity"
+31-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:25:7-56
+32            android:excludeFromRecents="true"
+32-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:27:7-40
+33            android:exported="false"
+33-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:26:7-31
+34            android:launchMode="singleTask"
+34-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:28:7-38
+35            android:noHistory="true"
+35-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:29:7-31
+36            android:screenOrientation="portrait"
+36-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:30:7-43
+37            android:taskAffinity="${applicationId}.applock"
+37-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:31:7-54
+38            android:theme="@android:style/Theme.Material.NoActionBar" />
+38-->/Users/devanshwalia/Desktop/personal/bookie/modules/app-lock/android/src/main/AndroidManifest.xml:32:7-64
+39    </application>
+40
+41</manifest>

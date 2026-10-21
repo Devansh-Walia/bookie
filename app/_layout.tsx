@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { customDarkTheme, customLightTheme } from "@/constants/theme";
 import { useAppColors, useApplyAppearance } from "@/hooks/useAppTheme";
 import CoverGenerator from "@/components/CoverGenerator";
+import { useAppLockSync } from "@/hooks/useAppLock";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -27,6 +28,7 @@ export default function RootLayout() {
   const [loaded, error] = useFonts(Ionicons.font);
   const colors = useAppColors();
   useApplyAppearance();
+  useAppLockSync();
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
@@ -50,6 +52,7 @@ export default function RootLayout() {
       <StatusBar style={dark ? "light" : "dark"} />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="app-lock" options={{ title: "App Lock" }} />
       </Stack>
       <CoverGenerator />
     </ThemeProvider>
