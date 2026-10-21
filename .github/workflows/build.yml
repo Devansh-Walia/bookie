@@ -39,7 +39,8 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk Bookie-${{ inputs.branch }}-${{ github.run_number }}.apk
+        env: { BRANCH: '${{ inputs.branch }}' }
+        run: cp android/app/build/outputs/apk/release/app-release.apk "Bookie-${BRANCH//\//-}-${{ github.run_number }}.apk"
       - uses: actions/upload-artifact@v4
         with: { name: android, path: Bookie-*.apk }
 
@@ -62,9 +63,10 @@ jobs:
             -sdk iphoneos -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
       - name: Package unsigned IPA
+        env: { BRANCH: '${{ inputs.branch }}' }
         run: |
           APP=$(ls -d ios/build/Build/Products/Release-iphoneos/*.app | head -1)
           mkdir Payload && cp -R "$APP" Payload/
-          zip -qr Bookie-${{ inputs.branch }}-${{ github.run_number }}-unsigned.ipa Payload
+          zip -qr "Bookie-${BRANCH//\//-}-${{ github.run_number }}-unsigned.ipa" Payload
       - uses: actions/upload-artifact@v4
         with: { name: ios, path: Bookie-*.ipa }
