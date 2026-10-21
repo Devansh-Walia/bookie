@@ -1,0 +1,72 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        type: choice
+        required: true
+        default: android
+        options:
+          - android
+          - ios
+          - both
+      branch:
+        description: 'Branch to build from'
+        type: string
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    if: ${{ inputs.platform == 'android' || inputs.platform == 'both' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Rename APK
+        env: { BRANCH: '${{ inputs.branch }}' }
+        run: cp android/app/build/outputs/apk/release/app-release.apk "Bookie-${BRANCH//\//-}-${{ github.run_number }}.apk"
+      - uses: actions/upload-artifact@v4
+        with: { name: android, path: Bookie-*.apk }
+
+  ios:
+    if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx expo prebuild --platform ios
+      - name: Build unsigned app
+        working-directory: ios
+        run: |
+          WS=$(ls -d *.xcworkspace | head -1); SCHEME="${WS%.xcworkspace}"
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package unsigned IPA
+        env: { BRANCH: '${{ inputs.branch }}' }
+        run: |
+          APP=$(ls -d ios/build/Build/Products/Release-iphoneos/*.app | head -1)
+          mkdir Payload && cp -R "$APP" Payload/
+          zip -qr "Bookie-${BRANCH//\//-}-${{ github.run_number }}-unsigned.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with: { name: ios, path: Bookie-*.ipa }
