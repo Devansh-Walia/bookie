@@ -1,0 +1,4 @@
+<resources>
+  <string name="app_lock_service_label">Bookie App Lock</string>
+  <string name="app_lock_service_description">Bookie uses this only to notice when you open an app you locked, so it can ask you to read first. It does not read screen content or what you type.</string>
+</resources>

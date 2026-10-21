@@ -1,0 +1,5 @@
+R_DEF: Internal format may change without notice
+local
+string app_lock_service_description
+string app_lock_service_label
+xml app_lock_service
