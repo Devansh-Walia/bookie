@@ -76,7 +76,10 @@ export function useLockProgress() {
 export function useAppLockStatus() {
   const read = useCallback(
     () => ({
-      serviceEnabled: AppLock?.isServiceEnabled() ?? false,
+      permissions: AppLock?.getPermissions() ?? {
+        usageAccess: false,
+        overlay: false,
+      },
       cheats: (AppLock?.getCheatStats() ?? null) as CheatStats | null,
     }),
     [],

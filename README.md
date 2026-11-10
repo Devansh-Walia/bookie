@@ -21,6 +21,26 @@ A personal PDF library and reader for iOS, Android and web, with covers, streaks
 
 > 🔒 **Private by design.** Everything stays on your device. There is no account, no server and no tracking.
 
+## 📲 Install
+
+Bookie ships as a signed APK on [GitHub Releases](https://github.com/Devansh-Walia/bookie/releases/latest).
+It is not on the Play Store, and it does not need to be — Play policy only covers apps
+distributed *through* Play.
+
+1. Download the `.apk` and allow your browser to **install unknown apps**.
+2. Play Protect will warn (*"Unsafe app blocked"*). Tap **More details → Install anyway**.
+3. **Samsung:** turn off **Auto Blocker**. **Xiaomi/Oppo/Vivo:** enable *Install unknown apps*.
+4. App Lock needs **Usage access** and **Display over other apps** — both granted from
+   Settings after install, from **Settings → App Lock** inside the app.
+
+Per-device steps, update behaviour and why Play Protect complains:
+**[docs/INSTALL.md](docs/INSTALL.md)**.
+
+> ⚠️ **Updates keep your data only if the signing key is unchanged.** The v1.1.0 APK was
+> signed with Expo's public debug key, so a build signed with the real release keystore
+> cannot install over it. Use the `signing: debug` workflow input for a drop-in update.
+> See [docs/INSTALL.md](docs/INSTALL.md#updating).
+
 ## ✨ Features
 
 - **Library**: import PDFs from your device. Covers are generated from page 1, and titles are read from PDF metadata (you can rename them).
@@ -73,7 +93,7 @@ components/   UI: BookList, BookCover, CoverGenerator, StatsScreen, SettingsScre
 constants/    theme tokens and reader themes
 hooks/        useAppTheme, useReadingSession...
 store/        zustand stores (books, stats, settings, app lock) and migrations
-modules/      local Expo modules (app-lock: Android accessibility blocker)
+modules/      local Expo modules (app-lock: Android app blocker)
 utils/        file handling, stats/streak logic, session tracker, PDF.js assets
 scripts/      build helpers (PDF.js asset copy)
 site/         static landing page (deployed via GitHub Pages)
@@ -85,7 +105,7 @@ site/         static landing page (deployed via GitHub Pages)
 - **File storage**: books live in `Documents/books/` and covers in `Documents/covers/`. They are referenced by file name, and the full path is resolved at runtime because the iOS container path changes between installs.
 - **Covers**: `CoverGenerator` is mounted in the root layout. It renders page 1 of each pending book in a hidden WebView and fills in the page count and title.
 - **Reading sessions**: distinct pages turned count as pages read. Time only counts while the app is in the foreground, and it is capped at 5 minutes after the last page turn.
-- **App Lock**: `modules/app-lock` is a local Expo module (Android only). An Accessibility Service watches which app is in the foreground and opens a native block screen over locked apps. JS (`hooks/useAppLock.ts`) pushes the rules and today's page count to native storage. Passes, cheat history and the midnight reset are handled natively, so they work while Bookie is closed. The pure rules live in `utils/appLock.ts`.
+- **App Lock**: `modules/app-lock` is a local Expo module (Android only). A foreground service polls usage events (Usage access) to see which app is in front, 80 ms on the home screen and 250 ms elsewhere, paused while the screen is off. It covers locked apps with a native overlay (Display over other apps) and sends them behind the home screen. No Accessibility Service is used, so sideloaded APKs aren't blocked by Play Protect's fraud filter. JS (`hooks/useAppLock.ts`) pushes the rules and today's page count to native storage. Passes, cheat history and the midnight reset are handled natively, so they work while Bookie is closed. The pure rules live in `utils/appLock.ts`.
 - **Theming**: use `useAppColors()` or `useThemedStyles(makeStyles)` with the tokens in `constants/theme.ts`. The reader has its own palette.
 
 More detail is in [MEMORY_BANK.md](MEMORY_BANK.md). Planned work is in [future.md](future.md).
@@ -93,6 +113,8 @@ More detail is in [MEMORY_BANK.md](MEMORY_BANK.md). Planned work is in [future.m
 ## 📦 Releases
 
 - GitHub Actions (`.github/workflows/release.yml`) builds releases. `pages.yml` deploys the landing page in `site/`.
+- `scripts/set-version-code.js` stamps `versionCode` from the git commit count before every build, so no release can be a downgrade of an earlier one.
+- Signing: `plugins/withReleaseSigning.js` uses the `BOOKIE_KEYSTORE_*` secrets. Set the `signing` workflow input to `debug` to sign with `android/app/debug.keystore` instead (matches the v1.1.0 release, so existing installs update in place).
 - EAS build profiles are in `eas.json`.
 - App identifier: `com.decker.bookie` (iOS and Android).
 

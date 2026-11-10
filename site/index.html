@@ -20,6 +20,13 @@ a.btn.alt{background:var(--card);color:var(--fg);border:1px solid #8884}
 .card{background:var(--card);padding:20px;border-radius:16px;box-shadow:0 2px 8px #0001}
 .card h3{margin:0 0 6px}small{opacity:.7;display:block;max-width:560px;margin:auto}
 footer{margin-top:48px;opacity:.6;font-size:.9rem}
+.steps{text-align:left;margin-top:40px;background:var(--card);padding:24px 28px;border-radius:16px;box-shadow:0 2px 8px #0001}
+.steps h2{margin:0 0 4px;font-size:1.25rem}
+.steps p.sub{margin:0 0 16px;opacity:.7;font-size:.92rem}
+.steps ol{margin:0;padding-left:20px}
+.steps li{margin:0 0 10px}
+.steps code{background:#8882;padding:1px 6px;border-radius:5px;font-size:.88em}
+.steps .note{font-size:.88rem;opacity:.75;margin:14px 0 0}
 </style>
 </head>
 <body>
@@ -34,6 +41,19 @@ footer{margin-top:48px;opacity:.6;font-size:.9rem}
   </div>
   <small id="ver">Latest release on GitHub.</small>
   <small>iOS builds are unsigned and must be sideloaded (e.g. AltStore or Sideloadly). On Android, allow “install unknown apps”.</small>
+
+  <section class="steps">
+    <h2>Installing on Android</h2>
+    <p class="sub">Bookie is not on the Play Store. That is fine — Play policy only covers apps distributed through Play. Android just makes the first install a few taps.</p>
+    <ol>
+      <li><strong>Allow your browser to install apps.</strong> When prompted, tap <em>Settings</em> and enable <em>Allow from this source</em> for Chrome, Firefox or Files.</li>
+      <li><strong>Get past Play Protect.</strong> It warns about every sideloaded app. Tap <em>More details</em> → <em>Install anyway</em>. This is a warning, not a block.</li>
+      <li><strong>Uninstall any older Bookie first</strong> — but only if you installed a build from Android Studio. Those are signed with a different key and will block the update.</li>
+      <li><strong>Samsung:</strong> turn off <em>Auto Blocker</em> (Settings → Security and privacy). <strong>Xiaomi/Oppo/Vivo:</strong> enable <em>Install unknown apps</em> in Settings.</li>
+    </ol>
+    <p class="note">App Lock needs <em>Usage access</em> and <em>Display over other apps</em>. Both are granted from Settings after install — never during install, and they are not what Play Protect warns about. Bookie opens both screens for you from <strong>Settings → App Lock</strong>.</p>
+    <p class="note">Full per-device steps: <a href="https://github.com/Devansh-Walia/bookie/blob/main/docs/INSTALL.md">docs/INSTALL.md</a></p>
+  </section>
   <div class="grid">
     <div class="card"><h3>📚 Library</h3>Import PDFs and see them with covers and progress.</div>
     <div class="card"><h3>🔖 Bookmarks &amp; highlights</h3>Mark pages and highlight text as you read.</div>

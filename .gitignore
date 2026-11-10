@@ -12,6 +12,7 @@ expo-env.d.ts
 # Native
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -44,3 +45,7 @@ yarn-error.*
 *.apk
 *.aab
 *.ipa
+
+# Gradle caches inside local modules
+modules/**/android/.gradle/
+modules/**/android/build/

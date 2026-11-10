@@ -27,10 +27,19 @@ export interface AppLockConfig {
   apps: { packageName: string; label: string; tier: number }[];
 }
 
+/** Special-access grants App Lock needs; both must be true. */
+export interface AppLockPermissions {
+  /** Settings → Usage access: lets Bookie see which app is in front. */
+  usageAccess: boolean;
+  /** Display over other apps: lets Bookie cover a locked app. */
+  overlay: boolean;
+}
+
 interface AppLockNative {
   getInstalledApps(): Promise<InstalledApp[]>;
-  isServiceEnabled(): boolean;
-  openAccessibilitySettings(): void;
+  getPermissions(): AppLockPermissions;
+  openUsageAccessSettings(): void;
+  openOverlaySettings(): void;
   openAppSettings(): void;
   setConfig(json: string): void;
   getCheatStats(): CheatStats;
@@ -42,8 +51,9 @@ const native = requireOptionalNativeModule<AppLockNative>("AppLock");
 export const AppLock = native
   ? {
       getInstalledApps: () => native.getInstalledApps(),
-      isServiceEnabled: () => native.isServiceEnabled(),
-      openAccessibilitySettings: () => native.openAccessibilitySettings(),
+      getPermissions: () => native.getPermissions(),
+      openUsageAccessSettings: () => native.openUsageAccessSettings(),
+      openOverlaySettings: () => native.openOverlaySettings(),
       openAppSettings: () => native.openAppSettings(),
       setConfig: (config: AppLockConfig) =>
         native.setConfig(JSON.stringify(config)),

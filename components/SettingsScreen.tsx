@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Switch,
@@ -18,6 +20,13 @@ import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { READER_THEMES } from "../constants/readerThemes";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
+import {
+  exportBackup,
+  formatBytes,
+  importBackup,
+  pickBackupFile,
+  shareBackup,
+} from "../utils/backup";
 import { haptics } from "../utils/haptics";
 import type { AppThemeMode } from "../types";
 
@@ -42,6 +51,63 @@ export default function SettingsScreen() {
   const setHaptics = useSettingsStore((s) => s.setHaptics);
   const lockedCount = useAppLockStore((s) => s.apps.length);
   const lockEnabled = useAppLockStore((s) => s.enabled);
+
+  const [busy, setBusy] = useState<null | "export" | "import">(null);
+  const [status, setStatus] = useState<string | null>(null);
+
+  const plural = (n: number, word: string) =>
+    `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  async function runExport() {
+    setBusy("export");
+    setStatus(null);
+    try {
+      const result = await exportBackup();
+      setStatus(
+        `Exported ${plural(result.books, "book")} · ${formatBytes(result.bytes)}`,
+      );
+      haptics.success();
+      await shareBackup(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(message);
+      Alert.alert("Export failed", message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runImport() {
+    setBusy("import");
+    setStatus(null);
+    try {
+      const uri = await pickBackupFile();
+      if (!uri) return;
+      const result = await importBackup(uri);
+      setStatus(
+        `Restored ${plural(result.books, "book")} · ${plural(result.files, "file")}`,
+      );
+      haptics.success();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(message);
+      Alert.alert("Restore failed", message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function confirmImport() {
+    haptics.tap();
+    Alert.alert(
+      "Restore from backup?",
+      "This replaces your library, reading progress, stats and settings with the contents of the backup. It cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Choose file", onPress: runImport },
+      ],
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -143,6 +209,52 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         ) : null}
 
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Backup</Text>
+          <Text style={styles.caption}>
+            Save your library, progress, stats and settings to one file, or
+            restore them. Worth doing before switching signing keys or moving to
+            a new phone.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.backupRow}
+            disabled={busy !== null}
+            onPress={() => {
+              haptics.tap();
+              runExport();
+            }}
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color={c.primary} />
+            <Text style={styles.backupLabel}>Export backup</Text>
+            {busy === "export" ? (
+              <ActivityIndicator size="small" color={c.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.backupRow}
+            disabled={busy !== null}
+            onPress={confirmImport}
+          >
+            <Ionicons
+              name="cloud-download-outline"
+              size={20}
+              color={c.primary}
+            />
+            <Text style={styles.backupLabel}>Restore from backup</Text>
+            {busy === "import" ? (
+              <ActivityIndicator size="small" color={c.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            )}
+          </TouchableOpacity>
+
+          {status ? <Text style={styles.caption}>{status}</Text> : null}
+        </View>
+
         <Text style={styles.footer}>
           Bookie v{Constants.expoConfig?.version}
         </Text>
@@ -197,6 +309,13 @@ const makeStyles = (c: AppColors) =>
       marginTop: spacing.sm,
     },
     linkCard: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+    backupRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      paddingVertical: 10,
+    },
+    backupLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: c.text },
     flex: { flex: 1 },
     footer: { textAlign: "center", color: c.textMuted, fontSize: 12 },
   });

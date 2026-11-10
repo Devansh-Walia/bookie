@@ -17,6 +17,13 @@ on:
         type: string
         required: true
         default: main
+      signing:
+        description: 'Signing key. "debug" keeps existing debug-signed installs updatable.'
+        type: choice
+        default: release
+        options:
+          - release
+          - debug
 
 permissions:
   contents: read
@@ -29,18 +36,42 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch }}
+          fetch-depth: 0   # versionCode comes from the commit count
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - run: npm ci
+      - name: Stamp versionCode
+        run: node scripts/set-version-code.js --from-git
       - run: npx expo prebuild --platform android --no-install
+      - name: Decode release keystore
+        if: ${{ inputs.signing != 'debug' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BOOKIE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Missing BOOKIE_KEYSTORE_BASE64 secret. Refusing to ship a debug-signed APK."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/bookie-release.keystore"
+          echo "BOOKIE_KEYSTORE_PATH=$RUNNER_TEMP/bookie-release.keystore" >> "$GITHUB_ENV"
+      - name: Sign with the debug keystore
+        if: ${{ inputs.signing == 'debug' }}
+        run: echo "::warning::Signing with android/app/debug.keystore (Expo's public key)."
       - name: Build release APK
         working-directory: android
+        env:
+          BOOKIE_KEYSTORE_PASSWORD: ${{ secrets.BOOKIE_KEYSTORE_PASSWORD }}
+          BOOKIE_KEY_ALIAS: ${{ secrets.BOOKIE_KEY_ALIAS }}
+          BOOKIE_KEY_PASSWORD: ${{ secrets.BOOKIE_KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
       - name: Rename APK
         env: { BRANCH: '${{ inputs.branch }}' }
-        run: cp android/app/build/outputs/apk/release/app-release.apk "Bookie-${BRANCH//\//-}-${{ github.run_number }}.apk"
+        run: |
+          SUFFIX=""
+          [ "${{ inputs.signing }}" = "debug" ] && SUFFIX="-debugkey"
+          cp android/app/build/outputs/apk/release/app-release.apk "Bookie-${BRANCH//\//-}-${{ github.run_number }}${SUFFIX}.apk"
       - uses: actions/upload-artifact@v4
         with: { name: android, path: Bookie-*.apk }
 

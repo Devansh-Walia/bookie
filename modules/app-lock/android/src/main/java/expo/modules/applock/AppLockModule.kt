@@ -1,6 +1,5 @@
 package expo.modules.applock
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -40,21 +39,29 @@ class AppLockModule : Module() {
         .sortedBy { (it["label"] as String).lowercase() }
     }
 
-    Function("isServiceEnabled") {
-      val enabled = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-      ) ?: ""
-      val me = ComponentName(context, AppLockService::class.java)
-      enabled.split(':').any {
-        val c = ComponentName.unflattenFromString(it)
-        c != null && c.packageName == me.packageName && c.className == me.className
-      }
+    /** Both are needed: usage access to see the app in front, overlay to cover it. */
+    Function("getPermissions") {
+      mapOf(
+        "usageAccess" to AppLockService.hasUsageAccess(context),
+        "overlay" to AppLockService.hasOverlay(context),
+      )
     }
 
-    Function("openAccessibilitySettings") {
+    Function("openUsageAccessSettings") {
+      val pkgUri = Uri.fromParts("package", context.packageName, null)
+      // Some OEMs support jumping straight to Bookie's entry; fall back to the list.
+      val direct = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).setData(pkgUri)
+      val intent = if (direct.resolveActivity(context.packageManager) != null) direct
+        else Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+      context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    Function("openOverlaySettings") {
       context.startActivity(
-        Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        Intent(
+          Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+          Uri.fromParts("package", context.packageName, null),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
       )
     }
 
@@ -69,6 +76,7 @@ class AppLockModule : Module() {
 
     Function("setConfig") { json: String ->
       LockPrefs.saveConfig(context, json)
+      AppLockService.sync(context)
     }
 
     Function("getCheatStats") {

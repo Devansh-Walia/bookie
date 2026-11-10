@@ -47,7 +47,8 @@ export default function AppLockScreen() {
 
   const { thresholds, pages } = useLockProgress();
   const unlocked = unlockedTierCount(thresholds, pages);
-  const { serviceEnabled, cheats, refresh } = useAppLockStatus();
+  const { permissions, cheats, refresh } = useAppLockStatus();
+  const ready = permissions.usageAccess && permissions.overlay;
 
   const [installed, setInstalled] = useState<InstalledApp[] | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -103,32 +104,53 @@ export default function AppLockScreen() {
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.content}>
-      {!serviceEnabled ? (
+      {!ready ? (
         <View style={[styles.card, styles.warnCard]}>
           <View style={styles.rowGap}>
             <Ionicons name="warning-outline" size={20} color={c.warning} />
-            <Text style={styles.cardTitle}>Turn on the App Lock service</Text>
+            <Text style={styles.cardTitle}>Finish setting up App Lock</Text>
           </View>
           <Text style={styles.body}>
-            Bookie needs Accessibility access to notice when you open a locked
-            app. It never reads what&apos;s on screen or what you type.
+            Bookie needs two permissions to block apps. It only sees which app
+            is open, never what&apos;s on screen or what you type.
           </Text>
-          <Text style={styles.body}>
-            Settings → Accessibility → Installed apps → Bookie App Lock → On.
-          </Text>
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => AppLock?.openAccessibilitySettings()}
-          >
-            <Text style={styles.primaryBtnText}>
-              Open Accessibility settings
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => AppLock?.openAppSettings()}>
-            <Text style={styles.link}>
-              Option greyed out? Open App info → ⋮ → Allow restricted settings
-            </Text>
-          </TouchableOpacity>
+          {(
+            [
+              {
+                done: permissions.usageAccess,
+                title: "1. Usage access",
+                hint: "Find Bookie and turn on Permit usage access.",
+                onPress: () => AppLock?.openUsageAccessSettings(),
+              },
+              {
+                done: permissions.overlay,
+                title: "2. Display over other apps",
+                hint: "Turn on Allow display over other apps.",
+                onPress: () => AppLock?.openOverlaySettings(),
+              },
+            ] as const
+          ).map((step) => (
+            <TouchableOpacity
+              key={step.title}
+              style={step.done ? styles.card : styles.primaryBtn}
+              disabled={step.done}
+              onPress={step.onPress}
+            >
+              <View style={styles.rowGap}>
+                <Ionicons
+                  name={step.done ? "checkmark-circle" : "open-outline"}
+                  size={18}
+                  color={step.done ? c.success : "#fff"}
+                />
+                <Text style={step.done ? styles.label : styles.primaryBtnText}>
+                  {step.title}
+                </Text>
+              </View>
+              {!step.done ? (
+                <Text style={styles.stepHint}>{step.hint}</Text>
+              ) : null}
+            </TouchableOpacity>
+          ))}
         </View>
       ) : null}
 
@@ -391,6 +413,7 @@ const makeStyles = (c: AppColors) =>
       gap: spacing.sm,
     },
     rowGap: { flexDirection: "row", alignItems: "center", gap: 8 },
+    stepHint: { fontSize: 12, color: "#fff", opacity: 0.85, marginTop: 2 },
     primaryBtn: {
       backgroundColor: c.primary,
       borderRadius: radius.md,
