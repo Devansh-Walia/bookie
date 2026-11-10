@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.telecom.TelecomManager
 import android.util.Base64
@@ -74,6 +75,14 @@ class AppLockModule : Module() {
       )
     }
 
+    /**
+     * True when Bookie was installed from outside the Play Store. Android 13+
+     * hides the Usage access and Display-over-other-apps toggles behind
+     * "Allow restricted settings" for such installs, so the UI needs to know
+     * whether to explain that instead of just saying "turn it on".
+     */
+    Function("isSideloaded") { isSideloaded(context) }
+
     Function("setConfig") { json: String ->
       LockPrefs.saveConfig(context, json)
       AppLockService.sync(context)
@@ -113,5 +122,25 @@ class AppLockModule : Module() {
     "data:image/png;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
   } catch (_: Exception) {
     null
+  }
+
+  private fun isSideloaded(ctx: Context): Boolean {
+    val pm = ctx.packageManager
+    val installer = try {
+      if (Build.VERSION.SDK_INT >= 30) {
+        pm.getInstallSourceInfo(ctx.packageName).installingPackageName
+      } else {
+        @Suppress("DEPRECATION") pm.getInstallerPackageName(ctx.packageName)
+      }
+    } catch (_: Exception) {
+      null
+    }
+    // A null installer means the APK was opened from a browser or Files app.
+    return installer == null || installer !in TRUSTED_INSTALLERS
+  }
+
+  private companion object {
+    /** Only the Play Store counts as a trusted source for restricted settings. */
+    val TRUSTED_INSTALLERS = setOf("com.android.vending")
   }
 }

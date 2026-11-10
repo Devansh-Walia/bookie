@@ -41,6 +41,8 @@ interface AppLockNative {
   openUsageAccessSettings(): void;
   openOverlaySettings(): void;
   openAppSettings(): void;
+  /** True when Bookie came from outside the Play Store (see "restricted settings"). */
+  isSideloaded(): boolean;
   setConfig(json: string): void;
   getCheatStats(): CheatStats;
 }
@@ -55,6 +57,13 @@ export const AppLock = native
       openUsageAccessSettings: () => native.openUsageAccessSettings(),
       openOverlaySettings: () => native.openOverlaySettings(),
       openAppSettings: () => native.openAppSettings(),
+      isSideloaded: () => {
+        try {
+          return native.isSideloaded();
+        } catch {
+          return false;
+        }
+      },
       setConfig: (config: AppLockConfig) =>
         native.setConfig(JSON.stringify(config)),
       getCheatStats: () => native.getCheatStats(),

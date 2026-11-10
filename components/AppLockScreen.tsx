@@ -52,6 +52,10 @@ export default function AppLockScreen() {
 
   const [installed, setInstalled] = useState<InstalledApp[] | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  /** Set once the user has opened a permission screen, so we know a still-off
+   *  toggle means Android refused it rather than "hasn't tried yet". */
+  const [attempted, setAttempted] = useState(false);
+  const [sideloaded] = useState(() => AppLock?.isSideloaded() ?? false);
 
   useFocusEffect(refresh);
 
@@ -134,7 +138,10 @@ export default function AppLockScreen() {
               key={step.title}
               style={step.done ? styles.card : styles.primaryBtn}
               disabled={step.done}
-              onPress={step.onPress}
+              onPress={() => {
+                setAttempted(true);
+                step.onPress();
+              }}
             >
               <View style={styles.rowGap}>
                 <Ionicons
@@ -151,6 +158,36 @@ export default function AppLockScreen() {
               ) : null}
             </TouchableOpacity>
           ))}
+
+          {attempted && !ready ? (
+            <View style={styles.blockedBox}>
+              <View style={styles.rowGap}>
+                <Ionicons name="shield-half-outline" size={18} color={c.warning} />
+                <Text style={styles.label}>Android blocked the toggle</Text>
+              </View>
+              <Text style={styles.body}>
+                {sideloaded
+                  ? "Bookie was installed from outside the Play Store, so Android 13+ hides these two switches until you allow restricted settings for it. This is a one-time step."
+                  : "If the switch flipped back off on its own, Android is holding the permission behind a restricted setting."}
+              </Text>
+              <Text style={styles.body}>
+                1. Open Bookie&apos;s app info{"\n"}
+                2. Tap the ⋮ menu in the top right{"\n"}
+                3. Choose “Allow restricted settings”{"\n"}
+                4. Come back here and turn the permission on
+              </Text>
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => AppLock?.openAppSettings()}
+              >
+                <Text style={styles.primaryBtnText}>Open app info</Text>
+              </TouchableOpacity>
+              <Text style={styles.caption}>
+                No ⋮ menu? Open the toggle once so Android shows its warning,
+                then check app info again.
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -400,6 +437,13 @@ const makeStyles = (c: AppColors) =>
       gap: spacing.sm,
     },
     warnCard: { borderColor: c.warning },
+    blockedBox: {
+      gap: spacing.sm,
+      marginTop: spacing.xs,
+      paddingTop: spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.border,
+    },
     cardTitle: { fontSize: 18, fontWeight: "700", color: c.text },
     label: { fontSize: 15, fontWeight: "600", color: c.text },
     body: { fontSize: 14, color: c.textSecondary, lineHeight: 20 },

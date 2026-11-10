@@ -66,11 +66,35 @@ never requested during install, and they are not what Play Protect warns about.
 
 Bookie opens both screens for you from **Settings → App Lock**.
 
-> On Android 13+ some permissions are hidden behind **"Allow restricted settings"**
-> for sideloaded apps. That applies to Accessibility, Notification access and
-> All-files access — Bookie uses none of them, so you should not hit it. If a
-> toggle is greyed out anyway: Settings → Apps → Bookie → ⋮ → **Allow restricted
-> settings**.
+#### "App was denied access" — the restricted-settings gate
+
+This is the one that catches everyone. When you flip either switch, Android
+shows:
+
+> **App was denied access**
+> Access to this permission can put your personal and financial info at risk.
+> It's possible that the app won't work properly without this restricted
+> permission.
+
+That is not Play Protect and not a bug in Bookie. Android 13+ treats every
+sideloaded app as untrusted and hides its special-access toggles behind a
+per-app switch called **Allow restricted settings**. Until you flip that, the
+toggle will bounce straight back off.
+
+One-time fix, ~15 seconds:
+
+1. **Settings → Apps → Bookie** (or long-press the Bookie icon → *App info*).
+2. Tap the **⋮** menu in the top-right corner.
+3. Choose **Allow restricted settings** and confirm.
+4. Go back to **Settings → App Lock** and turn the permissions on. They stick now.
+
+Bookie detects this and shows an **Open app info** button under the permission
+steps once a toggle has been refused.
+
+> If there is no **⋮** menu: open the permission toggle once so Android raises
+> its warning, dismiss it, then reopen app info — the menu item appears after
+> the first refusal. On some OEMs it is under *App info → ⋮ → Allow restricted
+> settings* only while the app is still flagged as sideloaded.
 
 ### Updating
 
