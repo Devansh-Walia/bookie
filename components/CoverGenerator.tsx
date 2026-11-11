@@ -3,7 +3,9 @@ import { Platform, StyleSheet, View } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import useBookStore from "../store/bookStore";
 import { getPdfJsSources } from "../utils/pdfjsAssets";
-import { bookFile, coverFile, documentDirectoryUri } from "../utils/files";
+import { base64ToBytes, stripDataUrlPrefix } from "../utils/base64";
+import { documentDirectoryUri } from "../utils/files";
+import { storedUrl, writeStored } from "../utils/storage";
 import { htmlSource, removeHtmlSource } from "../utils/webviewHtml";
 import { cleanMetadataTitle } from "../utils/titles";
 import { buildCoverHtml } from "./PDF/coverHtml";
@@ -56,13 +58,13 @@ export default function CoverGenerator() {
       try {
         const book = useBookStore.getState().books.find((b) => b.id === bookId);
         if (!book) return;
-        const pdf = bookFile(book.fileName);
-        if (!pdf.exists) throw new Error("missing file");
+        const pdfUrl = await storedUrl("books", book.fileName);
+        if (!pdfUrl) throw new Error("missing file");
         const { lib, worker } = await getPdfJsSources();
         const html = buildCoverHtml({
           pdfLibSource: lib,
           pdfWorkerSource: worker,
-          pdfUrl: pdf.uri,
+          pdfUrl,
         });
         const source = await htmlSource(`cover-${bookId}`, html);
         if (cancelled) return;
@@ -109,8 +111,8 @@ export default function CoverGenerator() {
         .books.find((b) => b.id === job.bookId);
       try {
         const fileName = `${job.bookId}.jpg`;
-        const base64 = data.dataUrl.substring(data.dataUrl.indexOf(",") + 1);
-        await coverFile(fileName).write(base64, { encoding: "base64" });
+        const bytes = base64ToBytes(stripDataUrlPrefix(data.dataUrl));
+        await writeStored("covers", fileName, bytes);
 
         const patch: Parameters<typeof updateBook>[1] = {
           coverFileName: fileName,

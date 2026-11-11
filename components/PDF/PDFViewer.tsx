@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -8,29 +9,22 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
 import useBookStore from "../../store/bookStore";
 import useStatsStore from "../../store/statsStore";
 import useSettingsStore from "../../store/settingsStore";
 import { getPdfJsSources } from "../../utils/pdfjsAssets";
-import { bookFile, documentDirectoryUri } from "../../utils/files";
-import { htmlSource } from "../../utils/webviewHtml";
+import { storedUrl } from "../../utils/storage";
 import { haptics } from "../../utils/haptics";
 import { useReadingSession } from "../../hooks/useReadingSession";
 import { buildPdfViewerHtml } from "./pdfViewerHtml";
+import { PdfHost } from "./PdfHost";
+import { WEBVIEW_BRIDGE_PRELUDE, type PdfHostHandle } from "./pdfHostTypes";
 import { palette } from "../../constants/theme";
 import { readerThemeInfo } from "../../constants/readerThemes";
 import { BookmarkPickerModal, BOOKMARK_ICONS } from "./BookmarkPickerModal";
 import { AnnotationsModal } from "./AnnotationsModal";
 import { ReaderSettingsModal } from "./ReaderSettingsModal";
 import { Celebration } from "../Celebration";
-
-// react-native-webview's class typing (`WebView<P = undefined>`) collapses its
-// props to `never` under TypeScript 6; pin the generic to `{}`.
-type BookieWebView = WebView<{}>;
-const TypedWebView = WebView as unknown as React.ComponentType<
-  React.ComponentProps<typeof WebView<{}>> & { ref?: React.Ref<BookieWebView> }
->;
 
 interface PDFViewerProps {
   bookId: string;
@@ -68,9 +62,7 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
 
   const [status, setStatus] = useState<ViewerStatus>("preparing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [webviewSource, setWebviewSource] = useState<
-    { html: string } | { uri: string } | null
-  >(null);
+  const [viewerHtml, setViewerHtml] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
   const [livePage, setLivePage] = useState(book?.currentPage ?? 1);
@@ -83,7 +75,7 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
 
-  const webViewRef = useRef<BookieWebView>(null);
+  const hostRef = useRef<PdfHostHandle>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { onPage: trackPage } = useReadingSession(status === "viewing");
@@ -106,7 +98,7 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
   }, [clearStuckLoadTimeout]);
 
   const inject = useCallback((js: string) => {
-    webViewRef.current?.injectJavaScript(`${js} true;`);
+    hostRef.current?.inject(js);
   }, []);
 
   const jumpToPage = useCallback(
@@ -124,13 +116,13 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
     async function prepare() {
       setStatus("preparing");
       setErrorMessage(null);
-      setWebviewSource(null);
+      setViewerHtml(null);
 
       try {
         if (!current)
           throw new Error("This book is no longer in your library.");
-        const pdf = bookFile(current.fileName);
-        if (!pdf.exists)
+        const pdfUrl = await storedUrl("books", current.fileName);
+        if (!pdfUrl)
           throw new Error("The PDF file for this book is missing.");
 
         const { lib, worker } = await getPdfJsSources();
@@ -139,7 +131,7 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
         const html = buildPdfViewerHtml({
           pdfLibSource: lib,
           pdfWorkerSource: worker,
-          pdfUrl: pdf.uri,
+          pdfUrl,
           initialPage: current.currentPage,
           bookmarks: (current.bookmarks ?? []).map((b) => ({
             page: b.page,
@@ -148,10 +140,12 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
           })),
           highlights: current.highlights ?? [],
           theme: useSettingsStore.getState().readerTheme,
+          // The native WebView supplies its own bridge; only web needs ours.
+          preludeScript:
+            Platform.OS === "web" ? WEBVIEW_BRIDGE_PRELUDE : undefined,
         });
-        const source = await htmlSource(`reader-${bookId}`, html);
         if (cancelled) return;
-        setWebviewSource(source);
+        setViewerHtml(html);
         setStatus("viewing");
         armStuckLoadTimeout();
       } catch (error) {
@@ -218,10 +212,10 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
   );
 
   const handleMessage = useCallback(
-    (event: WebViewMessageEvent) => {
+    (raw: string) => {
       let data: any;
       try {
-        data = JSON.parse(event.nativeEvent.data);
+        data = JSON.parse(raw);
       } catch {
         return;
       }
@@ -377,24 +371,21 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
           </View>
         </View>
 
-        {webviewSource ? (
-          <TypedWebView
-            ref={webViewRef}
-            key={`${bookId}-${retryToken}`}
-            style={[styles.webview, { backgroundColor: themeInfo.background }]}
-            source={webviewSource}
-            originWhitelist={["*"]}
-            javaScriptEnabled
-            domStorageEnabled
-            allowFileAccess
-            allowFileAccessFromFileURLs
-            allowUniversalAccessFromFileURLs
-            allowingReadAccessToURL={documentDirectoryUri()}
+        {viewerHtml ? (
+          <PdfHost
+            ref={hostRef}
+            html={viewerHtml}
+            cacheName={`reader-${bookId}`}
+            reloadKey={`${bookId}-${retryToken}`}
+            style={[
+              styles.webview,
+              { backgroundColor: themeInfo.background },
+            ]}
             onMessage={handleMessage}
-            onError={(syntheticEvent) => {
-              console.warn("WebView error: ", syntheticEvent.nativeEvent);
+            onError={(message) => {
+              console.warn("PDF host error:", message);
               setStatus("fatalError");
-              setErrorMessage("The PDF viewer failed to load.");
+              setErrorMessage(message);
             }}
           />
         ) : null}

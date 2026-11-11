@@ -2,8 +2,24 @@ name: Pages
 
 on:
   push:
-    branches: [main]
-    paths: ['site/**']
+    branches: [master]
+    paths:
+      - 'site/**'
+      - 'app/**'
+      - 'components/**'
+      - 'constants/**'
+      - 'hooks/**'
+      - 'modules/**'
+      - 'store/**'
+      - 'types/**'
+      - 'utils/**'
+      - 'assets/**'
+      - 'app.json'
+      - 'metro.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -21,8 +37,41 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+
+      - run: npm ci
+
+      # Don't publish a broken build.
+      - run: npm run typecheck
+      - run: npm test -- --ci
+
+      - name: Export the web app
+        run: npx expo export -p web
+
+      - name: Assemble the site
+        run: |
+          set -euo pipefail
+          mkdir -p public/app
+          # The app lives at /bookie/app/, the landing page at /bookie/.
+          cp -R dist/. public/app/
+          cp -R site/. public/
+
+          # GitHub Pages serves through Jekyll, which silently drops any
+          # directory starting with "_" — that would delete _expo/ and the
+          # whole app with it.
+          touch public/.nojekyll
+
+          # SPA fallback: a deep link like /bookie/app/stats has no file on
+          # disk, so Pages serves 404.html. Handing it the app shell lets
+          # expo-router resolve the route client-side.
+          cp public/app/index.html public/app/404.html
+
       - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
+        with: { path: public }
+
       - id: deployment
         uses: actions/deploy-pages@v4

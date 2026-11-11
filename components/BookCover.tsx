@@ -3,7 +3,7 @@ import { Image, StyleSheet, Text, View, ViewStyle } from "react-native";
 import type { Book } from "../types";
 import type { AppColors } from "../constants/theme";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
-import { coverFile } from "../utils/files";
+import { useStoredUrl } from "../hooks/useStoredUrl";
 
 const ACCENTS = [
   "#6366F1",
@@ -39,15 +39,18 @@ export function BookCover({ book, width, style }: Props) {
   const height = Math.round(width * 1.4);
   const radius = Math.max(4, Math.round(width * 0.05));
   const frame = { width, height, borderRadius: radius };
+  const coverUrl = useStoredUrl("covers", book.coverFileName);
 
   if (book.coverFileName) {
     return (
       <View style={[styles.shadow, frame, style]}>
-        <Image
-          source={{ uri: coverFile(book.coverFileName).uri }}
-          style={[frame, styles.image]}
-          resizeMode="cover"
-        />
+        {coverUrl ? (
+          <Image
+            source={{ uri: coverUrl }}
+            style={[frame, styles.image]}
+            resizeMode="cover"
+          />
+        ) : null}
         <View
           style={[
             styles.spine,

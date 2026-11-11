@@ -13,7 +13,7 @@ A personal PDF library and reader for iOS, Android and web, with covers, streaks
 [![React Native](https://img.shields.io/badge/React_Native-0.88-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://reactnative.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-[⬇️ Download](https://github.com/Devansh-Walia/bookie/releases/latest) · [🌐 Website](https://devansh-walia.github.io/bookie/) · [🗺️ Roadmap](future.md)
+[⬇️ Download](https://github.com/Devansh-Walia/bookie/releases/latest) · [🌐 Website](https://devansh-walia.github.io/bookie/) · [📖 Open the web app](https://devansh-walia.github.io/bookie/app/) · [🗺️ Roadmap](future.md)
 
 </div>
 
@@ -22,6 +22,21 @@ A personal PDF library and reader for iOS, Android and web, with covers, streaks
 > 🔒 **Private by design.** Everything stays on your device. There is no account, no server and no tracking.
 
 ## 📲 Install
+
+### In your browser
+
+[**Open the web app →**](https://devansh-walia.github.io/bookie/app/) — no install, no
+account. Books are stored in your browser's IndexedDB and stats in localStorage, so a
+reload keeps everything. It is a separate library from the phone app; move data between
+them with **Settings → Backup** (the ZIP format is shared).
+
+App Lock is Android-only and does not appear on the web.
+
+> ⚠️ Browsers can evict site storage. Safari clears IndexedDB for sites that aren't
+> installed to the home screen after about a week of not being opened. Export a backup
+> if a library matters to you.
+
+### On Android / iOS
 
 Bookie ships as a signed APK on [GitHub Releases](https://github.com/Devansh-Walia/bookie/releases/latest).
 It is not on the Play Store, and it does not need to be — Play policy only covers apps
@@ -73,6 +88,7 @@ npm start          # Expo dev server
 npm run ios        # build and run on iOS
 npm run android    # build and run on Android
 npm run web        # run in the browser
+npm run build:web  # export the static site to dist/
 ```
 
 The `android/` and `ios/` folders are generated (Continuous Native Generation) and gitignored. `app.json` is the source of truth, and `expo run:*` regenerates the native projects.
@@ -97,12 +113,15 @@ modules/      local Expo modules (app-lock: Android app blocker)
 utils/        file handling, stats/streak logic, session tracker, PDF.js assets
 scripts/      build helpers (PDF.js asset copy)
 site/         static landing page (deployed via GitHub Pages)
+docs/WEB.md   how the web build works and how it is hosted
 ```
 
 ## 🏛️ Architecture notes
 
 - **Stores**: `bookStore` holds books, progress, covers, bookmarks and highlights. `statsStore` holds the per-day log, daily goal and history. `settingsStore` holds the themes and haptics. All are persisted, and `store/migrations.ts` handles schema upgrades.
 - **File storage**: books live in `Documents/books/` and covers in `Documents/covers/`. They are referenced by file name, and the full path is resolved at runtime because the iOS container path changes between installs.
+- **Web storage**: `utils/storage.ts` / `utils/storage.web.ts` are the same API over two backends — `expo-file-system` on native, IndexedDB on web. Metro picks the `.web` variant automatically. Nothing else in the app knows which platform it is on.
+- **Web reader**: the native reader hosts the generated viewer HTML in a WebView; on web `components/PDF/PdfHost.web.tsx` hosts the *same* HTML in a same-origin `<iframe>` and bridges `postMessage`/`eval` to match `injectJavaScript`. See `docs/WEB.md`.
 - **Covers**: `CoverGenerator` is mounted in the root layout. It renders page 1 of each pending book in a hidden WebView and fills in the page count and title.
 - **Reading sessions**: distinct pages turned count as pages read. Time only counts while the app is in the foreground, and it is capped at 5 minutes after the last page turn.
 - **App Lock**: `modules/app-lock` is a local Expo module (Android only). A foreground service polls usage events (Usage access) to see which app is in front, 80 ms on the home screen and 250 ms elsewhere, paused while the screen is off. It covers locked apps with a native overlay (Display over other apps) and sends them behind the home screen. No Accessibility Service is used, so sideloaded APKs aren't blocked by Play Protect's fraud filter. JS (`hooks/useAppLock.ts`) pushes the rules and today's page count to native storage. Passes, cheat history and the midnight reset are handled natively, so they work while Bookie is closed. The pure rules live in `utils/appLock.ts`.

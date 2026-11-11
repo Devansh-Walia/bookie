@@ -37,6 +37,12 @@ export interface BuildPdfViewerHtmlOptions {
   highlights?: HighlightInput[];
   /** Reader theme id applied via `body[data-theme]`. */
   theme?: string;
+  /**
+   * Script emitted before anything else in the document. The web build uses it
+   * to define the `window.ReactNativeWebView` bridge that the viewer script
+   * posts through.
+   */
+  preludeScript?: string;
 }
 
 /** Escapes any `</script` sequence so inlined source can't prematurely
@@ -65,6 +71,7 @@ export function buildPdfViewerHtml({
   bookmarks = [],
   highlights = [],
   theme = "original",
+  preludeScript = "",
 }: BuildPdfViewerHtmlOptions): string {
   const safeLibSource = escapeClosingScriptTag(pdfLibSource);
   const workerSourceLiteral = escapeClosingScriptTag(
@@ -94,6 +101,7 @@ export function buildPdfViewerHtml({
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
     <style>${VIEWER_CSS}</style>
+    ${preludeScript ? `<script>${escapeClosingScriptTag(preludeScript)}</script>` : ""}
   </head>
   <body data-theme="${safeTheme}">
     <div id="viewer">

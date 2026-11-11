@@ -1,8 +1,9 @@
 import Constants from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
-import { Directory, File, Paths } from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import JSZip from "jszip";
+import { Platform } from "react-native";
 import useAppLockStore from "../store/appLockStore";
 import useBookStore from "../store/bookStore";
 import { migrateBook } from "../store/migrations";
@@ -18,7 +19,7 @@ import {
   type BackupManifest,
   type BackupStores,
 } from "./backupFormat";
-import { booksDir, coversDir } from "./files";
+import { listStored, readStored, storedSize, writeStored } from "./storage";
 
 export {
   BACKUP_FORMAT,
@@ -33,11 +34,12 @@ export {
 const MAX_BACKUP_BYTES = 500 * 1024 * 1024;
 
 export interface ExportResult {
-  uri: string;
   fileName: string;
   books: number;
   files: number;
   bytes: number;
+  /** The ZIP itself, so the caller can save or share it. */
+  data: Uint8Array;
 }
 
 export interface ImportResult {
@@ -45,14 +47,6 @@ export interface ImportResult {
   files: number;
   exportedAt: string;
   appVersion: string;
-}
-
-function listFiles(dir: Directory): File[] {
-  try {
-    return dir.list().filter((entry): entry is File => entry instanceof File);
-  } catch {
-    return [];
-  }
 }
 
 function snapshotStores(): BackupStores {
@@ -84,13 +78,12 @@ function snapshotStores(): BackupStores {
 
 /** Validates and normalises a manifest. Pure, so it is unit tested. */
 export async function exportBackup(): Promise<ExportResult> {
-  const bookFiles = listFiles(booksDir());
-  const coverFiles = listFiles(coversDir());
+  const bookNames = await listStored("books");
+  const coverNames = await listStored("covers");
 
-  const total = [...bookFiles, ...coverFiles].reduce(
-    (sum, file) => sum + (file.size || 0),
-    0,
-  );
+  let total = 0;
+  for (const name of bookNames) total += await storedSize("books", name);
+  for (const name of coverNames) total += await storedSize("covers", name);
   if (total > MAX_BACKUP_BYTES) {
     throw new Error(
       `Your library is ${formatBytes(total)}, too large for a single backup (limit ${formatBytes(MAX_BACKUP_BYTES)}). Remove some books and try again.`,
@@ -103,77 +96,96 @@ export async function exportBackup(): Promise<ExportResult> {
     exportedAt: new Date().toISOString(),
     appVersion: Constants.expoConfig?.version ?? "unknown",
     stores: snapshotStores(),
-    files: {
-      books: bookFiles.map((file) => file.name),
-      covers: coverFiles.map((file) => file.name),
-    },
+    files: { books: bookNames, covers: coverNames },
   };
 
   const zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(manifest, null, 2));
-  for (const file of bookFiles) zip.file(`books/${file.name}`, await file.bytes());
-  for (const file of coverFiles) zip.file(`covers/${file.name}`, await file.bytes());
+  for (const name of bookNames) {
+    zip.file(`books/${name}`, await readStored("books", name));
+  }
+  for (const name of coverNames) {
+    zip.file(`covers/${name}`, await readStored("covers", name));
+  }
 
   // STORE: PDFs and PNGs are already compressed, deflating them only burns CPU.
-  const bytes = await zip.generateAsync({
+  const data = await zip.generateAsync({
     type: "uint8array",
     compression: "STORE",
   });
 
-  const fileName = `bookie-backup-${manifest.exportedAt.slice(0, 10)}.zip`;
-  const out = new File(Paths.cache, fileName);
-  if (out.exists) out.delete();
-  out.create({ intermediates: true });
-  out.write(bytes);
-
   return {
-    uri: out.uri,
-    fileName,
+    fileName: `bookie-backup-${manifest.exportedAt.slice(0, 10)}.zip`,
     books: manifest.stores.books.books.length,
-    files: bookFiles.length + coverFiles.length,
-    bytes: bytes.byteLength,
+    files: bookNames.length + coverNames.length,
+    bytes: data.byteLength,
+    data,
   };
 }
 
-export async function shareBackup(result: ExportResult): Promise<void> {
+/**
+ * Hands the ZIP to the user: the share sheet on native, a plain download on
+ * web (there is no share sheet in a browser).
+ */
+export async function saveBackup(result: ExportResult): Promise<void> {
+  if (Platform.OS === "web") {
+    const blob = new Blob([result.data as BlobPart], {
+      type: "application/zip",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = result.fileName;
+    anchor.click();
+    // Let the browser start the download before the URL goes away.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return;
+  }
+
+  const out = new File(Paths.cache, result.fileName);
+  if (out.exists) out.delete();
+  out.create({ intermediates: true });
+  await out.write(result.data);
+
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error(
-      `Sharing is not available on this device. The backup was written to ${result.uri}`,
+      `Sharing is not available on this device. The backup was written to ${out.uri}`,
     );
   }
-  await Sharing.shareAsync(result.uri, {
+  await Sharing.shareAsync(out.uri, {
     mimeType: "application/zip",
     dialogTitle: "Save your Bookie backup",
     UTI: "public.zip-archive",
   });
 }
 
-/** Opens the system picker. Returns null when the user cancels. */
-export async function pickBackupFile(): Promise<string | null> {
+/** Opens the system picker. Returns the ZIP bytes, or null when cancelled. */
+export async function pickBackupFile(): Promise<Uint8Array | null> {
   const picked = await DocumentPicker.getDocumentAsync({
-    type: ["application/zip", "application/x-zip-compressed", "application/octet-stream"],
+    type: [
+      "application/zip",
+      "application/x-zip-compressed",
+      "application/octet-stream",
+    ],
     copyToCacheDirectory: true,
     multiple: false,
   });
   if (picked.canceled || !picked.assets?.[0]) return null;
-  return picked.assets[0].uri;
+  const asset = picked.assets[0];
+  if (asset.file) return new Uint8Array(await asset.file.arrayBuffer());
+  return new File(asset.uri).bytes();
 }
 
 async function restoreFiles(
   zip: JSZip,
-  folder: "books" | "covers",
-  dir: Directory,
+  kind: "books" | "covers",
   names: string[],
 ): Promise<number> {
   let restored = 0;
   for (const name of names) {
-    const entry = zip.file(`${folder}/${name}`);
+    const entry = zip.file(`${kind}/${name}`);
     if (!entry) continue;
-    const bytes = await entry.async("uint8array");
-    const target = new File(dir, name);
-    if (target.exists) target.delete();
-    target.create({ intermediates: true });
-    target.write(bytes);
+    await writeStored(kind, name, await entry.async("uint8array"));
     restored++;
   }
   return restored;
@@ -226,13 +238,10 @@ function applyStores(stores: BackupStores) {
   }
 }
 
-export async function importBackup(uri: string): Promise<ImportResult> {
-  const source = new File(uri);
-  if (!source.exists) throw new Error("That file could not be read.");
-
+export async function importBackup(data: Uint8Array): Promise<ImportResult> {
   let zip: JSZip;
   try {
-    zip = await JSZip.loadAsync(await source.bytes());
+    zip = await JSZip.loadAsync(data);
   } catch {
     throw new Error("That file is not a valid ZIP archive.");
   }
@@ -244,8 +253,8 @@ export async function importBackup(uri: string): Promise<ImportResult> {
   const manifest = parseManifest(await entry.async("string"));
 
   // Files first: if this throws, the stores are still untouched.
-  const books = await restoreFiles(zip, "books", booksDir(), manifest.files.books);
-  const covers = await restoreFiles(zip, "covers", coversDir(), manifest.files.covers);
+  const books = await restoreFiles(zip, "books", manifest.files.books);
+  const covers = await restoreFiles(zip, "covers", manifest.files.covers);
 
   applyStores(manifest.stores);
 

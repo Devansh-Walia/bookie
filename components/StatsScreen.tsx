@@ -13,6 +13,7 @@ import useBookStore from "../store/bookStore";
 import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
+import { CONTENT_MAX_WIDTH } from "../hooks/useBreakpoint";
 import { ProgressBar } from "./BookCover";
 import { haptics } from "../utils/haptics";
 import { useFocusEffect } from "expo-router";
@@ -365,6 +366,9 @@ const makeStyles = (c: AppColors) =>
       padding: spacing.lg,
       paddingBottom: spacing.xl * 2,
       gap: spacing.md,
+      width: "100%",
+      maxWidth: CONTENT_MAX_WIDTH,
+      alignSelf: "center",
     },
     title: {
       fontSize: 30,

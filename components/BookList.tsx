@@ -7,7 +7,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +19,10 @@ import { useBookActions } from "../hooks/useBookActions";
 import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
+import {
+  CONTENT_MAX_WIDTH,
+  useBreakpoint,
+} from "../hooks/useBreakpoint";
 import { BookCover, ProgressBar, progressOf } from "./BookCover";
 import { BookActionsSheet } from "./BookActionsSheet";
 import { SessionToast, ToastMessage } from "./SessionToast";
@@ -41,7 +44,6 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "finished", label: "Finished" },
 ];
 
-const COLUMNS = 3;
 const GAP = 14;
 
 function matchesFilter(book: Book, filter: Filter) {
@@ -68,7 +70,7 @@ export default function BookList() {
   const c = useAppColors();
   const styles = useThemedStyles(makeStyles);
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, columns, isDesktop } = useBreakpoint();
   const books = useBookStore((s) => s.books);
   const removeBook = useBookStore((s) => s.removeBook);
   const renameBook = useBookStore((s) => s.renameBook);
@@ -118,7 +120,8 @@ export default function BookList() {
   }, [books]);
 
   const tileWidth = Math.floor(
-    (width - spacing.lg * 2 - GAP * (COLUMNS - 1)) / COLUMNS,
+    (Math.min(width, CONTENT_MAX_WIDTH) - spacing.lg * 2 - GAP * (columns - 1)) /
+      columns,
   );
 
   const openBook = useCallback((book: Book) => {
@@ -294,11 +297,14 @@ export default function BookList() {
       ) : (
         <FlatList
           data={visible}
-          key={`grid-${COLUMNS}`}
-          numColumns={COLUMNS}
+          key={`grid-${columns}`}
+          numColumns={columns}
           keyExtractor={(b) => b.id}
           ListHeaderComponent={header}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            isDesktop && styles.listContentDesktop,
+          ]}
           columnWrapperStyle={{ gap: GAP, paddingHorizontal: spacing.lg }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -482,6 +488,11 @@ const makeStyles = (c: AppColors) =>
     chipText: { fontSize: 13, fontWeight: "600", color: c.textSecondary },
     chipTextActive: { color: c.onInverse },
     listContent: { paddingBottom: spacing.xl * 3 },
+    listContentDesktop: {
+      maxWidth: CONTENT_MAX_WIDTH,
+      width: "100%",
+      alignSelf: "center",
+    },
     tileTitle: {
       fontSize: 13,
       fontWeight: "700",

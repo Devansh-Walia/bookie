@@ -20,12 +20,13 @@ import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { READER_THEMES } from "../constants/readerThemes";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
+import { CONTENT_MAX_WIDTH } from "../hooks/useBreakpoint";
 import {
   exportBackup,
   formatBytes,
   importBackup,
   pickBackupFile,
-  shareBackup,
+  saveBackup,
 } from "../utils/backup";
 import { haptics } from "../utils/haptics";
 import type { AppThemeMode } from "../types";
@@ -67,7 +68,7 @@ export default function SettingsScreen() {
         `Exported ${plural(result.books, "book")} · ${formatBytes(result.bytes)}`,
       );
       haptics.success();
-      await shareBackup(result);
+      await saveBackup(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
@@ -81,9 +82,9 @@ export default function SettingsScreen() {
     setBusy("import");
     setStatus(null);
     try {
-      const uri = await pickBackupFile();
-      if (!uri) return;
-      const result = await importBackup(uri);
+      const data = await pickBackupFile();
+      if (!data) return;
+      const result = await importBackup(data);
       setStatus(
         `Restored ${plural(result.books, "book")} · ${plural(result.files, "file")}`,
       );
@@ -266,7 +267,14 @@ export default function SettingsScreen() {
 const makeStyles = (c: AppColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: c.background },
-    content: { padding: spacing.lg, paddingBottom: 40, gap: spacing.md },
+    content: {
+      padding: spacing.lg,
+      paddingBottom: 40,
+      gap: spacing.md,
+      width: "100%",
+      maxWidth: CONTENT_MAX_WIDTH,
+      alignSelf: "center",
+    },
     title: { fontSize: 30, fontWeight: "800", color: c.text },
     card: {
       backgroundColor: c.card,

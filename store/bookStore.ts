@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Book, BookStore } from "../types";
-import { bookFile, coverFile, deleteQuietly } from "../utils/files";
+import { deleteStored } from "../utils/storage";
 import { migrateBook } from "./migrations";
 
 export function makeId(): string {
@@ -76,8 +76,12 @@ const useBookStore = create<BookStore>()(
       removeBook: (id) => {
         const book = get().books.find((b) => b.id === id);
         if (book) {
-          deleteQuietly(bookFile(book.fileName));
-          if (book.coverFileName) deleteQuietly(coverFile(book.coverFileName));
+          // Best-effort: the metadata is gone either way, and a stray file is
+          // harmless (the backup export lists the directory, not the store).
+          void deleteStored("books", book.fileName);
+          if (book.coverFileName) {
+            void deleteStored("covers", book.coverFileName);
+          }
         }
         set((state) => ({ books: state.books.filter((b) => b.id !== id) }));
       },

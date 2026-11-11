@@ -10,7 +10,8 @@
     "test": "jest",
     "postinstall": "node ./scripts/copy-pdfjs-assets.js",
     "test:watch": "jest --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:web": "expo export -p web"
   },
   "jest": {
     "preset": "jest-expo",
