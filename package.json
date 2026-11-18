@@ -14,9 +14,26 @@
     "build:web": "expo export -p web"
   },
   "jest": {
-    "preset": "jest-expo",
-    "transformIgnorePatterns": [
-      "node_modules/(?!(?:\\.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|zustand))"
+    "projects": [
+      {
+        "preset": "jest-expo",
+        "testPathIgnorePatterns": [
+          "/node_modules/",
+          "\\.dom\\.test\\.[jt]sx?$"
+        ],
+        "transformIgnorePatterns": [
+          "node_modules/(?!(?:\\.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|zustand))"
+        ]
+      },
+      {
+        "preset": "jest-expo/web",
+        "testMatch": [
+          "**/*.dom.test.[jt]s?(x)"
+        ],
+        "transformIgnorePatterns": [
+          "node_modules/(?!(?:\\.pnpm|(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|zustand))"
+        ]
+      }
     ]
   },
   "dependencies": {

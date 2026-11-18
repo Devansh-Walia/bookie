@@ -80,6 +80,50 @@ describe("buildPdfViewerHtml", () => {
   });
 });
 
+describe("reader keyboard support", () => {
+  const base = {
+    pdfLibSource: "",
+    pdfWorkerSource: "",
+    pdfUrl: "file:///books/example.pdf",
+    initialPage: 1,
+  };
+
+  it("turns pages from the keyboard inside the viewer document", () => {
+    const html = buildPdfViewerHtml(base);
+    expect(html).toContain('document.addEventListener("keydown"');
+    expect(html).toContain('key === "ArrowRight"');
+    expect(html).toContain('key === "PageDown"');
+    expect(html).toContain('key === "Home"');
+    expect(html).toContain('key === "End"');
+  });
+
+  it("exposes page-turn helpers the host can inject", () => {
+    const html = buildPdfViewerHtml(base);
+    expect(html).toContain("nextPage: goNext");
+    expect(html).toContain("prevPage: goPrev");
+    expect(html).toContain("firstPage: goFirst");
+    expect(html).toContain("lastPage: goLast");
+  });
+
+  it("forwards reader shortcuts to the host", () => {
+    const html = buildPdfViewerHtml(base);
+    expect(html).toContain('post({ type: "shortcut", action: "close" })');
+    expect(html).toContain('post({ type: "shortcut", action: "bookmark" })');
+    expect(html).toContain('post({ type: "shortcut", action: "theme" })');
+    expect(html).toContain(
+      'post({ type: "shortcut", action: "annotations" })',
+    );
+  });
+
+  it("makes the page area and controls reachable with Tab", () => {
+    const html = buildPdfViewerHtml(base);
+    expect(html).toContain('<div id="viewer" tabindex="0"');
+    expect(html).toContain('aria-keyshortcuts="ArrowLeft PageUp"');
+    expect(html).toContain('aria-keyshortcuts="ArrowRight PageDown"');
+    expect(html).toContain('aria-live="polite"');
+  });
+});
+
 describe("reader themes", () => {
   const base = {
     pdfLibSource: "",

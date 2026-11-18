@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -39,6 +40,19 @@ const OPTIONS: {
   { id: "system", label: "System", icon: "phone-portrait-outline" },
   { id: "light", label: "Light", icon: "sunny-outline" },
   { id: "dark", label: "Dark", icon: "moon-outline" },
+];
+
+/** Shown on the web build, where the keyboard is the primary input. */
+const KEYBOARD_SHORTCUTS: { keys: string; action: string }[] = [
+  { keys: "← → ↑ ↓", action: "Move between books" },
+  { keys: "Enter", action: "Open the selected book" },
+  { keys: "Tab / Shift+Tab", action: "Move between controls" },
+  { keys: "A", action: "Add books" },
+  { keys: "← →", action: "Turn pages in the reader" },
+  { keys: "Space / Shift+Space", action: "Next / previous page" },
+  { keys: "Home / End", action: "First / last page" },
+  { keys: "B · T · A", action: "Bookmark · theme · annotations" },
+  { keys: "Esc", action: "Close the reader or a dialog" },
 ];
 
 export default function SettingsScreen() {
@@ -128,6 +142,10 @@ export default function SettingsScreen() {
                     haptics.tap();
                     setAppTheme(o.id);
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${o.label} appearance`}
+                  accessibilityState={{ selected: active }}
+                  focusable
                 >
                   <Ionicons
                     name={o.icon}
@@ -165,6 +183,10 @@ export default function SettingsScreen() {
                     haptics.tap();
                     setReaderTheme(t.id);
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t.name} reader theme`}
+                  accessibilityState={{ selected: active }}
+                  focusable
                 >
                   <View style={[styles.swatch, { backgroundColor: t.page }]}>
                     <Text style={styles.emoji}>{t.emoji}</Text>
@@ -188,14 +210,33 @@ export default function SettingsScreen() {
               value={hapticsOn}
               onValueChange={setHaptics}
               trackColor={{ true: c.primary }}
+              accessibilityLabel="Haptics on page turns"
             />
           </View>
         </View>
+
+        {Platform.OS === "web" ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Keyboard</Text>
+            <Text style={styles.caption}>
+              Tab and Shift+Tab move between controls everywhere in the app.
+            </Text>
+            {KEYBOARD_SHORTCUTS.map((s) => (
+              <View key={s.keys} style={styles.shortcutRow}>
+                <Text style={styles.shortcutKeys}>{s.keys}</Text>
+                <Text style={styles.shortcutAction}>{s.action}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {AppLock ? (
           <TouchableOpacity
             style={[styles.card, styles.linkCard]}
             onPress={() => router.push("/app-lock")}
+            accessibilityRole="button"
+            accessibilityLabel="App Lock settings"
+            focusable
           >
             <Ionicons name="lock-closed-outline" size={22} color={c.primary} />
             <View style={styles.flex}>
@@ -225,6 +266,10 @@ export default function SettingsScreen() {
               haptics.tap();
               runExport();
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Export backup"
+            accessibilityState={{ disabled: busy !== null }}
+            focusable
           >
             <Ionicons name="cloud-upload-outline" size={20} color={c.primary} />
             <Text style={styles.backupLabel}>Export backup</Text>
@@ -239,6 +284,10 @@ export default function SettingsScreen() {
             style={styles.backupRow}
             disabled={busy !== null}
             onPress={confirmImport}
+            accessibilityRole="button"
+            accessibilityLabel="Restore from backup"
+            accessibilityState={{ disabled: busy !== null }}
+            focusable
           >
             <Ionicons
               name="cloud-download-outline"
@@ -310,6 +359,19 @@ const makeStyles = (c: AppColors) =>
     },
     emoji: { fontSize: 16 },
     caption: { fontSize: 12, color: c.textMuted },
+    shortcutRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      paddingVertical: 4,
+    },
+    shortcutKeys: {
+      width: 128,
+      fontSize: 12,
+      fontWeight: "700",
+      color: c.text,
+    },
+    shortcutAction: { flex: 1, fontSize: 12, color: c.textSecondary },
     switchRow: {
       flexDirection: "row",
       alignItems: "center",

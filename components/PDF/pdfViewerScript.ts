@@ -272,14 +272,102 @@ export function buildViewerScript({
     showPage(n).catch(function (err) { post({ type: "error", message: describeError(err) }); });
   }
 
-  prevBtn.onclick = function () {
+  function goPrev() {
     if (!pdfDoc || currentPage <= 1 || isAnimating) return;
     flipTo(currentPage - 1);
-  };
-  nextBtn.onclick = function () {
+  }
+  function goNext() {
     if (!pdfDoc || currentPage >= pdfDoc.numPages || isAnimating) return;
     flipTo(currentPage + 1);
-  };
+  }
+  function goFirst() {
+    if (!pdfDoc) return;
+    jumpToPage(1);
+  }
+  function goLast() {
+    if (!pdfDoc) return;
+    jumpToPage(pdfDoc.numPages);
+  }
+
+  prevBtn.onclick = goPrev;
+  nextBtn.onclick = goNext;
+
+  function closestTag(node, names) {
+    var el = node && node.nodeType === 3 ? node.parentNode : node;
+    while (el && el !== document.body) {
+      var tag = el.tagName ? el.tagName.toUpperCase() : "";
+      if (names.indexOf(tag) !== -1) return tag;
+      el = el.parentNode;
+    }
+    return "";
+  }
+
+  function isTypingTarget(node) {
+    if (closestTag(node, ["INPUT", "TEXTAREA", "SELECT"])) return true;
+    var el = node && node.nodeType === 3 ? node.parentNode : node;
+    while (el && el !== document.body) {
+      if (el.isContentEditable) return true;
+      el = el.parentNode;
+    }
+    return false;
+  }
+
+  function isControlTarget(node) {
+    if (closestTag(node, ["BUTTON", "A", "INPUT"])) return true;
+    var el = node && node.nodeType === 3 ? node.parentNode : node;
+    while (el && el !== document.body) {
+      if (el.getAttribute && el.getAttribute("role") === "button") return true;
+      el = el.parentNode;
+    }
+    return false;
+  }
+
+  // Keyboard reader: arrows / PageUp / PageDown / Space turn pages, Home and
+  // End jump to the ends, Escape and the letter keys drive the reader chrome
+  // (handled by the host through a "shortcut" message).
+  document.addEventListener("keydown", function (e) {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (isTypingTarget(e.target)) return;
+
+    var key = e.key;
+    var handled = true;
+
+    if (key === " " || key === "Spacebar") {
+      // Space activates a focused control; only turn pages otherwise.
+      if (isControlTarget(e.target)) return;
+      if (e.shiftKey) goPrev();
+      else goNext();
+    } else if (
+      key === "ArrowRight" || key === "ArrowDown" || key === "PageDown" ||
+      key === "j" || key === "l"
+    ) {
+      goNext();
+    } else if (
+      key === "ArrowLeft" || key === "ArrowUp" || key === "PageUp" ||
+      key === "k" || key === "h"
+    ) {
+      goPrev();
+    } else if (key === "Home") {
+      goFirst();
+    } else if (key === "End") {
+      goLast();
+    } else if (key === "Escape") {
+      post({ type: "shortcut", action: "close" });
+    } else if (key === "b" || key === "B") {
+      post({ type: "shortcut", action: "bookmark" });
+    } else if (key === "t" || key === "T") {
+      post({ type: "shortcut", action: "theme" });
+    } else if (key === "a" || key === "A") {
+      post({ type: "shortcut", action: "annotations" });
+    } else {
+      handled = false;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
 
   var tsx = 0, tsy = 0, tst = 0;
   viewerEl.addEventListener("touchstart", function (e) {
@@ -394,6 +482,10 @@ export function buildViewerScript({
 
   window.__bookie = {
     jumpToPage: function (n) { jumpToPage(n); },
+    nextPage: goNext,
+    prevPage: goPrev,
+    firstPage: goFirst,
+    lastPage: goLast,
     setBookmarks: function (list) { bookmarks = list || []; updateBookmarkRibbon(); },
     setTheme: function (name) {
       if (typeof name === "string" && /^[a-z-]+$/.test(name)) document.body.setAttribute("data-theme", name);

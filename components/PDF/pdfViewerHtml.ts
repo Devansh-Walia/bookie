@@ -62,6 +62,8 @@ export function escapeClosingScriptTag(source: string): string {
  *  - Book thickness: left/right "page stacks" grow/shrink with progress.
  *  - Text selection & highlighting via a transparent PDF.js text layer.
  *  - Bookmark ribbon indicator.
+ *  - Keyboard page turns (arrows, PageUp/PageDown, Space, Home/End) plus
+ *    Tab/Shift+Tab between the on-page controls.
  */
 export function buildPdfViewerHtml({
   pdfLibSource,
@@ -104,7 +106,7 @@ export function buildPdfViewerHtml({
     ${preludeScript ? `<script>${escapeClosingScriptTag(preludeScript)}</script>` : ""}
   </head>
   <body data-theme="${safeTheme}">
-    <div id="viewer">
+    <div id="viewer" tabindex="0" role="region" aria-label="Book pages">
       <div id="pageBack" class="page-layer"></div>
       <div id="pageFront" class="page-layer"></div>
       <div id="shadow"></div>
@@ -116,9 +118,9 @@ export function buildPdfViewerHtml({
         <span class="swatch" style="background:#F472B6"></span>
       </div>
       <div id="controls">
-        <button id="prev" disabled aria-label="Previous page">&#8249;</button>
-        <span id="pageInfo">Page ${safeInitialPage}</span>
-        <button id="next" disabled aria-label="Next page">&#8250;</button>
+        <button id="prev" disabled aria-label="Previous page" aria-keyshortcuts="ArrowLeft PageUp">&#8249;</button>
+        <span id="pageInfo" role="status" aria-live="polite" aria-atomic="true">Page ${safeInitialPage}</span>
+        <button id="next" disabled aria-label="Next page" aria-keyshortcuts="ArrowRight PageDown">&#8250;</button>
       </div>
       <div id="statusOverlay">
         <div id="statusSpinner"></div>

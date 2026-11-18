@@ -60,6 +60,7 @@ Per-device steps, update behaviour and why Play Protect complains:
 
 - **Library**: import PDFs from your device. Covers are generated from page 1, and titles are read from PDF metadata (you can rename them).
 - **Reader**: PDF.js in a WebView with page transitions and touch controls. Your place is remembered per book.
+- **Keyboard navigation** (web, and hardware keyboards on tablets): arrow keys move through the library and turn pages, Tab/Shift+Tab move between controls, Enter opens a book, Home/End jump to the first/last page, and Esc closes the reader or a dialog. The full list is in Settings → Keyboard.
 - **Bookmarks and highlights**
 - **Reader themes**: switch live while reading.
 - **Light/dark app theme**: system, light or dark, set in Settings.

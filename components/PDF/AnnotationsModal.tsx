@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../../constants/theme";
 import { Bookmark, Highlight } from "../../types";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 
 interface Props {
   visible: boolean;
@@ -33,6 +34,11 @@ export function AnnotationsModal({
   const sortedBookmarks = [...bookmarks].sort((a, b) => a.page - b.page);
   const sortedHighlights = [...highlights].sort((a, b) => a.page - b.page);
 
+  useKeyboardShortcuts(
+    [{ keys: ["Escape"], handler: () => onClose() }],
+    visible,
+  );
+
   return (
     <Modal
       visible={visible}
@@ -47,6 +53,9 @@ export function AnnotationsModal({
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close annotations"
+              focusable
             >
               <Ionicons name="close" size={24} color="#94A3B8" />
             </TouchableOpacity>
@@ -62,6 +71,9 @@ export function AnnotationsModal({
                   <TouchableOpacity
                     style={styles.rowMain}
                     onPress={() => onJump(b.page)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Jump to bookmark ${b.label || "bookmark"} on page ${b.page}`}
+                    focusable
                   >
                     <Text style={styles.rowIcon}>{b.icon}</Text>
                     <View style={styles.rowText}>
@@ -74,6 +86,9 @@ export function AnnotationsModal({
                   <TouchableOpacity
                     onPress={() => onRemoveBookmark(b.id)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove bookmark on page ${b.page}`}
+                    focusable
                   >
                     <Ionicons name="trash-outline" size={20} color="#94A3B8" />
                   </TouchableOpacity>
@@ -94,6 +109,9 @@ export function AnnotationsModal({
                   <TouchableOpacity
                     style={styles.rowMain}
                     onPress={() => onJump(h.page)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Jump to highlight on page ${h.page}`}
+                    focusable
                   >
                     <View
                       style={[styles.highlightDot, { backgroundColor: h.color }]}
@@ -108,6 +126,9 @@ export function AnnotationsModal({
                   <TouchableOpacity
                     onPress={() => onRemoveHighlight(h.id)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove highlight on page ${h.page}`}
+                    focusable
                   >
                     <Ionicons name="trash-outline" size={20} color="#94A3B8" />
                   </TouchableOpacity>

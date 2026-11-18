@@ -12,6 +12,7 @@ import {
 import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { useThemedStyles } from "../hooks/useAppTheme";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 const COLORS = [
   "#6366F1",
@@ -142,6 +143,11 @@ export function Celebration({
     }).start();
   }, [visible, pop]);
 
+  useKeyboardShortcuts(
+    [{ keys: ["Escape"], handler: () => onClose() }],
+    visible,
+  );
+
   return (
     <Modal
       visible={visible}
@@ -190,6 +196,9 @@ export function Celebration({
             style={styles.button}
             onPress={onClose}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Close celebration"
+            focusable
           >
             <Text style={styles.buttonText}>Woohoo! 🎉</Text>
           </TouchableOpacity>

@@ -1,7 +1,16 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  AccessibilityInfo,
+  findNodeHandle,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,7 +19,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import useBookStore from "../store/bookStore";
 import useStatsStore from "../store/statsStore";
 import { Book } from "../types";
@@ -34,6 +43,27 @@ import {
   ProgressSnapshot,
 } from "../utils/stats";
 import { haptics } from "../utils/haptics";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import {
+  focusNode,
+  isActivationKey,
+  keyFromEvent,
+  nextGridIndex,
+} from "../utils/keyboard";
+
+/** Keys that move the library selection (see `utils/keyboard.ts`). */
+const GRID_KEYS = [
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "h",
+  "j",
+  "k",
+  "l",
+  "Home",
+  "End",
+];
 
 type Filter = "all" | "reading" | "unread" | "finished";
 
@@ -88,6 +118,37 @@ export default function BookList() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [celebrate, setCelebrate] = useState<Book | null>(null);
   const beforeRef = useRef<ProgressSnapshot | null>(null);
+  // Keyboard selection: the tile arrow keys act on, and the DOM nodes to focus.
+  // -1 means nothing is selected yet, so the first arrow key lands on tile 0.
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const tileRefs = useRef<Array<unknown>>([]);
+  // Tabs stay mounted after their first visit, so the library's global keys
+  // must only listen while this tab is the visible one.
+  const [tabFocused, setTabFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setTabFocused(true);
+      return () => setTabFocused(false);
+    }, []),
+  );
+  // Only draw the selection ring once the keyboard is in use, so mouse clicks
+  // don't leave a ring behind.
+  const [keyboardMode, setKeyboardMode] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Tab" || GRID_KEYS.includes(event.key)) {
+        setKeyboardMode(true);
+      }
+    };
+    const onPointerDown = () => setKeyboardMode(false);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
 
   const streak = useMemo(() => computeStreaks(days), [days]);
   const todayPages = snapshot(days).today.pages;
@@ -129,6 +190,42 @@ export default function BookList() {
     haptics.tap();
     setReadingId(book.id);
   }, []);
+
+  const focusTile = useCallback((index: number) => {
+    const node = tileRefs.current[index];
+    if (focusNode(node)) return;
+    // Native: hand focus to the accessibility tree so a hardware keyboard
+    // lands on the tile (RN views have no imperative focus()).
+    const handle = findNodeHandle(node as never);
+    if (handle != null) AccessibilityInfo.setAccessibilityFocus(handle);
+  }, []);
+
+  /** Moves the selection with `key`; returns false when it wasn't a grid key. */
+  const moveFocus = useCallback(
+    (key: string) => {
+      if (visible.length === 0) return false;
+      // Nothing focused yet: the first arrow key selects the first book.
+      if (focusIndex < 0) {
+        if (nextGridIndex(0, key, columns, visible.length) === null) {
+          return false;
+        }
+        setFocusIndex(0);
+        focusTile(0);
+        return true;
+      }
+      const next = nextGridIndex(focusIndex, key, columns, visible.length);
+      if (next === null) return false;
+      setFocusIndex(next);
+      focusTile(next);
+      return true;
+    },
+    [focusIndex, columns, visible.length, focusTile],
+  );
+
+  // Keep the selection inside the list when the filter changes the count.
+  useEffect(() => {
+    setFocusIndex((i) => (i < 0 ? i : Math.min(i, visible.length - 1)));
+  }, [visible.length]);
 
   const closeReader = useCallback(() => {
     setReadingId(null);
@@ -172,6 +269,21 @@ export default function BookList() {
     }
   }, [handleAddBook]);
 
+  // Library-wide keys. Enter/Space on a focused tile is handled by the tile
+  // itself (react-native-web presses it), so only movement lives here.
+  useKeyboardShortcuts(
+    [
+      {
+        keys: GRID_KEYS,
+        handler: (e) => {
+          if (moveFocus(e.key)) e.preventDefault();
+        },
+      },
+      { keys: ["a"], handler: () => void addBooks() },
+    ],
+    tabFocused && !readingId && !actionsBook,
+  );
+
   const header = (
     <View>
       <View style={styles.header}>
@@ -190,12 +302,21 @@ export default function BookList() {
           ]}
           onPress={() => router.push("/stats")}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={`Reading streak: ${streak.current} days. Open stats`}
+          focusable
         >
           <Text style={styles.streakText}>
             {streak.current > 0 ? "🔥" : "🌱"} {streak.current}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerAddButton} onPress={addBooks}>
+        <TouchableOpacity
+          style={styles.headerAddButton}
+          onPress={addBooks}
+          accessibilityRole="button"
+          accessibilityLabel="Add books"
+          focusable
+        >
           <Ionicons name="add" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -205,6 +326,9 @@ export default function BookList() {
           style={styles.hero}
           activeOpacity={0.9}
           onPress={() => openBook(continueBook)}
+          accessibilityRole="button"
+          accessibilityLabel={`Continue reading ${continueBook.title}`}
+          focusable
         >
           <BookCover book={continueBook} width={78} />
           <View style={styles.heroBody}>
@@ -250,6 +374,10 @@ export default function BookList() {
                   haptics.tap();
                   setFilter(f.id);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={`${f.label} filter`}
+                accessibilityState={{ selected: active }}
+                focusable
               >
                 <Text
                   style={[styles.chipText, active && styles.chipTextActive]}
@@ -260,6 +388,12 @@ export default function BookList() {
             );
           })}
         </View>
+      ) : null}
+
+      {isDesktop && books.length > 0 ? (
+        <Text style={styles.keyboardHint}>
+          ← → ↑ ↓ move · Enter open · Tab next · A add book
+        </Text>
       ) : null}
     </View>
   );
@@ -288,7 +422,13 @@ export default function BookList() {
               Import PDFs and build a reading streak. Covers, progress and stats
               appear automatically.
             </Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={addBooks}>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={addBooks}
+              accessibilityRole="button"
+              accessibilityLabel="Add your first book"
+              focusable
+            >
               <Ionicons name="add" size={20} color="#fff" />
               <Text style={styles.emptyButtonText}>Add your first book</Text>
             </TouchableOpacity>
@@ -314,17 +454,42 @@ export default function BookList() {
                 : "Nothing here yet."}
             </Text>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <Pressable
+              ref={(node) => {
+                tileRefs.current[index] = node;
+              }}
               style={({ pressed }) => [
                 { width: tileWidth, marginBottom: spacing.lg },
                 pressed && { opacity: 0.8 },
+                keyboardMode && index === focusIndex && styles.tileFocused,
               ]}
               onPress={() => openBook(item)}
               onLongPress={() => {
                 haptics.tap();
                 setActionsBook(item);
               }}
+              onFocus={() => setFocusIndex(index)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.title}. ${statusLine(item)}`}
+              accessibilityHint="Opens the reader"
+              tabIndex={0}
+              focusable
+              onKeyDown={
+                // Web keys are handled by the document listener above (and by
+                // Pressable for Enter/Space); native hardware keyboards need
+                // this explicit handler.
+                Platform.OS === "web"
+                  ? undefined
+                  : (event) => {
+                      const key = keyFromEvent(event);
+                      if (isActivationKey(key)) {
+                        openBook(item);
+                        return;
+                      }
+                      moveFocus(key);
+                    }
+              }
             >
               <BookCover book={item} width={tileWidth} />
               <Text style={styles.tileTitle} numberOfLines={2}>
@@ -342,6 +507,9 @@ export default function BookList() {
                 <TouchableOpacity
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   onPress={() => setActionsBook(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`More actions for ${item.title}`}
+                  focusable
                 >
                   <Ionicons
                     name="ellipsis-horizontal"
@@ -500,6 +668,13 @@ const makeStyles = (c: AppColors) =>
       marginTop: 8,
       lineHeight: 17,
     },
+    tileFocused: {
+      borderRadius: radius.md,
+      outlineWidth: 2,
+      outlineStyle: "solid",
+      outlineColor: c.primary,
+      outlineOffset: 3,
+    },
     tileFooter: {
       flexDirection: "row",
       alignItems: "center",
@@ -513,6 +688,13 @@ const makeStyles = (c: AppColors) =>
       color: c.textSecondary,
       marginTop: spacing.xl,
       paddingHorizontal: spacing.lg,
+    },
+    keyboardHint: {
+      fontSize: 12,
+      color: c.textMuted,
+      paddingHorizontal: spacing.lg,
+      marginTop: -spacing.xs,
+      marginBottom: spacing.md,
     },
     emptyState: {
       flex: 1,

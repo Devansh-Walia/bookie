@@ -25,6 +25,8 @@ import { BookmarkPickerModal, BOOKMARK_ICONS } from "./BookmarkPickerModal";
 import { AnnotationsModal } from "./AnnotationsModal";
 import { ReaderSettingsModal } from "./ReaderSettingsModal";
 import { Celebration } from "../Celebration";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
+import { isControlTarget, pageIntent } from "../../utils/keyboard";
 
 interface PDFViewerProps {
   bookId: string;
@@ -35,6 +37,23 @@ type ViewerStatus = "preparing" | "viewing" | "fatalError";
 
 const STUCK_LOAD_TIMEOUT_MS = 30000;
 const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
+/** Keys the reader listens for (see `pageIntent` in utils/keyboard.ts). */
+const PAGE_KEYS = [
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "h",
+  "j",
+  "k",
+  "l",
+  "Home",
+  "End",
+  " ",
+];
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -105,6 +124,20 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
     (page: number) => {
       inject(`window.__bookie && window.__bookie.jumpToPage(${page});`);
       setAnnotationsVisible(false);
+    },
+    [inject],
+  );
+
+  const openBookmarkPicker = useCallback(() => {
+    setPickerIcon(BOOKMARK_ICONS[0]);
+    setPickerLabel("");
+    setPickerVisible(true);
+  }, []);
+
+  /** Turns the page from outside the viewer document (host-level keys). */
+  const turnPage = useCallback(
+    (intent: "next" | "prev" | "first" | "last") => {
+      inject(`window.__bookie && window.__bookie.${intent}Page();`);
     },
     [inject],
   );
@@ -238,6 +271,23 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
         case "pageChange":
           if (typeof data.page === "number") handlePageChange(data.page);
           break;
+        case "shortcut":
+          // Keys pressed while the viewer document has focus (web iframe).
+          switch (data.action) {
+            case "close":
+              onClose();
+              break;
+            case "bookmark":
+              openBookmarkPicker();
+              break;
+            case "theme":
+              setSettingsVisible(true);
+              break;
+            case "annotations":
+              setAnnotationsVisible(true);
+              break;
+          }
+          break;
         case "addHighlight":
           if (data.highlight) {
             addHighlight(bookId, {
@@ -265,14 +315,10 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
       handlePageChange,
       addHighlight,
       removeHighlight,
+      onClose,
+      openBookmarkPicker,
     ],
   );
-
-  const openBookmarkPicker = useCallback(() => {
-    setPickerIcon(BOOKMARK_ICONS[0]);
-    setPickerLabel("");
-    setPickerVisible(true);
-  }, []);
 
   const saveBookmark = useCallback(() => {
     addBookmark(bookId, {
@@ -283,6 +329,32 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
     haptics.tap();
     setPickerVisible(false);
   }, [addBookmark, bookId, livePage, pickerIcon, pickerLabel]);
+
+  const modalOpen =
+    pickerVisible || annotationsVisible || settingsVisible || celebrating;
+
+  // Reader keys for when focus is on the host chrome rather than inside the
+  // viewer document (which handles the same keys itself).
+  useKeyboardShortcuts(
+    [
+      {
+        keys: PAGE_KEYS,
+        handler: (e) => {
+          const intent = pageIntent(e.key, e.shiftKey);
+          if (!intent) return;
+          // Space activates a focused control; only turn pages otherwise.
+          if (e.key === " " && isControlTarget(e.target)) return;
+          e.preventDefault();
+          turnPage(intent);
+        },
+      },
+      { keys: ["Escape"], handler: () => onClose() },
+      { keys: ["b", "B"], handler: () => openBookmarkPicker() },
+      { keys: ["t", "T"], handler: () => setSettingsVisible(true) },
+      { keys: ["a", "A"], handler: () => setAnnotationsVisible(true) },
+    ],
+    status !== "fatalError" && !modalOpen,
+  );
 
   const containerStyle = [
     styles.container,
@@ -315,12 +387,18 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
             <TouchableOpacity
               style={[styles.actionButton, styles.retryButton]}
               onPress={() => setRetryToken((t) => t + 1)}
+              accessibilityRole="button"
+              accessibilityLabel="Retry opening the PDF"
+              focusable
             >
               <Text style={styles.actionButtonText}>Retry</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, styles.closeActionButton]}
               onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close the reader"
+              focusable
             >
               <Text style={styles.actionButtonText}>Close</Text>
             </TouchableOpacity>
@@ -338,6 +416,9 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
             style={styles.topBarButton}
             onPress={onClose}
             hitSlop={HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel="Close the reader"
+            focusable
           >
             <Ionicons name="chevron-down" size={24} color="#F1F5F9" />
           </TouchableOpacity>
@@ -347,6 +428,9 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
               style={styles.topBarButton}
               onPress={() => setSettingsVisible(true)}
               hitSlop={HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="Reading settings"
+              focusable
             >
               <Ionicons
                 name="color-palette-outline"
@@ -358,6 +442,9 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
               style={styles.topBarButton}
               onPress={openBookmarkPicker}
               hitSlop={HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={`Add bookmark on page ${livePage}`}
+              focusable
             >
               <Ionicons name="bookmark-outline" size={20} color="#F1F5F9" />
             </TouchableOpacity>
@@ -365,6 +452,9 @@ export default function PDFViewer({ bookId, onClose }: PDFViewerProps) {
               style={styles.topBarButton}
               onPress={() => setAnnotationsVisible(true)}
               hitSlop={HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel="Bookmarks and highlights"
+              focusable
             >
               <Ionicons name="list" size={20} color="#F1F5F9" />
             </TouchableOpacity>

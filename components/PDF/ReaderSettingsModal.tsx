@@ -11,6 +11,7 @@ import {
 import { palette } from "../../constants/theme";
 import { READER_THEMES } from "../../constants/readerThemes";
 import type { ReaderTheme } from "../../types";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 
 interface Props {
   visible: boolean;
@@ -30,6 +31,11 @@ export function ReaderSettingsModal({
   onHapticsChange,
   onClose,
 }: Props) {
+  useKeyboardShortcuts(
+    [{ keys: ["Escape"], handler: () => onClose() }],
+    visible,
+  );
+
   return (
     <Modal
       visible={visible}
@@ -50,6 +56,10 @@ export function ReaderSettingsModal({
                   style={[styles.theme, active && styles.themeActive]}
                   onPress={() => onThemeChange(t.id)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t.name} reading theme`}
+                  accessibilityState={{ selected: active }}
+                  focusable
                 >
                   <View
                     style={[styles.swatch, { backgroundColor: t.background }]}
@@ -81,6 +91,7 @@ export function ReaderSettingsModal({
               value={haptics}
               onValueChange={onHapticsChange}
               trackColor={{ true: palette.primary, false: palette.darkBorder }}
+              accessibilityLabel="Haptics on page turns"
             />
           </View>
         </Pressable>

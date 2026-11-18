@@ -69,6 +69,16 @@ export const PdfHost = forwardRef<PdfHostHandle, PdfHostProps>(function PdfHost(
       ref={frameRef}
       srcDoc={html}
       title="Bookie reader"
+      tabIndex={0}
+      // Focus the frame once the document is live so arrow keys turn pages
+      // straight away, without the reader having to be clicked first.
+      onLoad={() => {
+        try {
+          frameRef.current?.focus();
+        } catch {
+          // Focusing a frame can be blocked; the keys still work after a click.
+        }
+      }}
       style={frameStyle}
       onError={() => onError("The PDF viewer failed to load.")}
     />

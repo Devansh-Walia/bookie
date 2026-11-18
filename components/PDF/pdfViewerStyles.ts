@@ -118,6 +118,10 @@ html, body {
 }
 #controls button:active { transform: scale(0.9); background: rgba(255,255,255,0.1); }
 #controls button:disabled { opacity: 0.3; }
+#controls button:focus-visible, #retryButton:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+#viewer:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 #pageInfo {
   min-width: 96px; text-align: center; font-size: 14px; font-weight: 600;
   letter-spacing: 0.02em; color: var(--text); font-variant-numeric: tabular-nums;

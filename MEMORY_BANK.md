@@ -43,6 +43,19 @@
   via `window.__bookie.setTheme`.
 - **Fun bits:** confetti `Celebration` on reaching the last page, a session
   toast after closing the reader, and haptics (`utils/haptics.ts`).
+- **Keyboard navigation:** `utils/keyboard.ts` holds the pure key mapping
+  (`gridIntent`/`nextGridIndex` for the library, `pageIntent` for the reader,
+  `isEditableTarget`/`isControlTarget` so text fields and focused buttons keep
+  their keys). `hooks/useKeyboardShortcuts.ts` binds those keys to a document
+  `keydown` listener on web only; native relies on `onKeyDown` + `focusable`
+  on the tiles. Interactive elements need `accessibilityRole="button"` (plus
+  `focusable` on `TouchableOpacity`, which does not type `tabIndex`) to become
+  tab stops in react-native-web. The reader handles keys twice on purpose: the
+  viewer script (`pdfViewerScript.ts`) owns them while the iframe has focus and
+  posts `{type:"shortcut"}` messages for the chrome, while `PDFViewer` handles
+  the same keys when focus is on the host. `PdfHost.web.tsx` focuses the iframe
+  on load so arrows work immediately. `pdfViewerKeyboard.dom.test.ts` drives the
+  viewer script in jsdom (the `jest-expo/web` project in `package.json`).
 - **App Lock (Android only):** `modules/app-lock` is a local Expo module
   (classic `ModuleDefinition` API) and is autolinked from `./modules`.
   - `AppLockService` (AccessibilityService, window-state events only) opens

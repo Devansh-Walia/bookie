@@ -16,6 +16,7 @@ import type { Book } from "../types";
 import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { BookCover, progressOf } from "./BookCover";
 
 interface Props {
@@ -41,6 +42,21 @@ export function BookActionsSheet({
   useEffect(() => {
     if (book) setTitle(book.title);
   }, [book]);
+
+  // Escape closes the sheet, saving the title like a backdrop tap does.
+  useKeyboardShortcuts(
+    [
+      {
+        keys: ["Escape"],
+        handler: () => {
+          const next = title.trim();
+          if (book && next && next !== book.title) onRename(book.id, next);
+          onClose();
+        },
+      },
+    ],
+    !!book,
+  );
 
   if (!book) return null;
 
@@ -110,6 +126,11 @@ export function BookActionsSheet({
                 onToggleFinished(book);
                 onClose();
               }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                book.finishedAt ? "Mark as not finished" : "Mark as finished"
+              }
+              focusable
             >
               <Ionicons
                 name={book.finishedAt ? "refresh" : "checkmark-done"}
@@ -120,7 +141,13 @@ export function BookActionsSheet({
                 {book.finishedAt ? "Mark as not finished" : "Mark as finished"}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.action} onPress={confirmRemove}>
+            <TouchableOpacity
+              style={styles.action}
+              onPress={confirmRemove}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${book.title} from library`}
+              focusable
+            >
               <Ionicons name="trash-outline" size={20} color={c.danger} />
               <Text style={[styles.actionText, { color: c.danger }]}>
                 Remove from library

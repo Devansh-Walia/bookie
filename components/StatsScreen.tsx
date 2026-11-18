@@ -133,6 +133,9 @@ export default function StatsScreen() {
               <TouchableOpacity
                 style={styles.goalBtn}
                 onPress={() => changeGoal(-1)}
+                accessibilityRole="button"
+                accessibilityLabel="Decrease daily page goal"
+                focusable
               >
                 <Ionicons name="remove" size={16} color={c.primary} />
               </TouchableOpacity>
@@ -140,6 +143,9 @@ export default function StatsScreen() {
               <TouchableOpacity
                 style={styles.goalBtn}
                 onPress={() => changeGoal(1)}
+                accessibilityRole="button"
+                accessibilityLabel="Increase daily page goal"
+                focusable
               >
                 <Ionicons name="add" size={16} color={c.primary} />
               </TouchableOpacity>

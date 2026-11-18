@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { palette } from "../../constants/theme";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
 
 export const BOOKMARK_ICONS = [
   "🔖", "📌", "⭐", "❤️", "💡", "❗", "📖", "🏷️",
@@ -33,6 +34,12 @@ export function BookmarkPickerModal({
   onCancel,
   onSave,
 }: Props) {
+  // Escape cancels; Enter in the label field saves (see onSubmitEditing).
+  useKeyboardShortcuts(
+    [{ keys: ["Escape"], handler: () => onCancel() }],
+    visible,
+  );
+
   return (
     <Modal
       visible={visible}
@@ -51,6 +58,10 @@ export function BookmarkPickerModal({
                 key={emoji}
                 style={[styles.iconCell, icon === emoji && styles.iconCellActive]}
                 onPress={() => onIconChange(emoji)}
+                accessibilityRole="button"
+                accessibilityLabel={`Bookmark icon ${emoji}`}
+                accessibilityState={{ selected: icon === emoji }}
+                focusable
               >
                 <Text style={styles.iconEmoji}>{emoji}</Text>
               </TouchableOpacity>
@@ -63,13 +74,28 @@ export function BookmarkPickerModal({
             placeholderTextColor="#94A3B8"
             value={label}
             onChangeText={onLabelChange}
+            onSubmitEditing={onSave}
+            returnKeyType="done"
+            accessibilityLabel="Bookmark label"
           />
 
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.ghostButton} onPress={onCancel}>
+            <TouchableOpacity
+              style={styles.ghostButton}
+              onPress={onCancel}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel"
+              focusable
+            >
               <Text style={styles.ghostButtonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryButton} onPress={onSave}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={onSave}
+              accessibilityRole="button"
+              accessibilityLabel="Save bookmark"
+              focusable
+            >
               <Text style={styles.primaryButtonText}>Save</Text>
             </TouchableOpacity>
           </View>
