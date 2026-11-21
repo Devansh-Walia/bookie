@@ -50,5 +50,8 @@ yarn-error.*
 modules/**/android/.gradle/
 modules/**/android/build/
 
-# Pages build output
-public/
+# Pages build output (assembled by .github/workflows/pages.yml).
+# NOTE: `public/` is Expo's static-assets folder and is copied into every
+# `expo export`. Never assemble the Pages site there: `public/index.html`
+# would overwrite the app shell (dist/index.html) with the landing page.
+pages/

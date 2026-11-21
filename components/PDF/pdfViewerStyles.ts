@@ -5,6 +5,7 @@
  */
 export const VIEWER_CSS = `
 :root {
+  --paper: #FFFFFF;
   --bg: #0F172A; --surface: #1E293B; --border: #2A3548;
   --text: #F1F5F9; --text-muted: #94A3B8;
   --accent: #8B5CF6; --accent-strong: #6366F1;
@@ -14,27 +15,50 @@ html, body {
   margin: 0; padding: 0; height: 100%; width: 100%;
   overflow: hidden; background: var(--bg); color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  touch-action: none; -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none; user-select: none;
 }
 #viewer {
   position: relative; height: 100%; width: 100%; overflow: hidden;
-  perspective: 1800px;
+  touch-action: none;
   background: radial-gradient(120% 120% at 50% 0%, #16202F 0%, #0F172A 70%);
   --stack-left-w: 0px; --stack-right-w: 0px;
 }
+/* ---- Page curl (see pageCurl.ts) ---------------------------------------- */
+#stage { position: absolute; inset: 0; transform-origin: 0 0; }
 .page-layer {
   position: absolute; inset: 0; display: flex; align-items: center;
-  justify-content: center; padding: 24px;
-  backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d; will-change: transform;
+  justify-content: center; padding: 28px 44px 92px; /* = PAGE_INSET */
 }
 #pageBack { z-index: 1; }
-#pageFront { z-index: 2; }
-#pageFront.flip-forward { transform-origin: left center; animation: flipForward 0.55s cubic-bezier(0.4, 0.1, 0.2, 1) forwards; }
-#pageFront.flip-backward { transform-origin: right center; animation: flipBackward 0.55s cubic-bezier(0.4, 0.1, 0.2, 1) forwards; }
-@keyframes flipForward { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(-180deg); } }
-@keyframes flipBackward { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(180deg); } }
+#underClip { z-index: 2; }
+#pageFront { z-index: 3; }
+#flapClip { z-index: 4; }
+.curl-clip {
+  position: absolute; display: none; overflow: hidden; pointer-events: none;
+}
+/* Carries the sheet's drop shadow; #flapClip keeps it on the page. */
+#flapCast { position: absolute; inset: 0; }
+#flap {
+  position: absolute; left: 0; top: 0; transform-origin: 0 0;
+  will-change: transform, clip-path; pointer-events: none;
+}
+#flap canvas {
+  display: block; width: 100%; height: 100%; border-radius: 0; box-shadow: none;
+}
+/* The back of the sheet: paper with the page showing faintly through. */
+.flap-paper { position: absolute; inset: 0; background: var(--paper); opacity: 0.86; }
+.curl-band { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+#flapShade {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.22) 0%, rgba(255,255,255,0.3) 10%,
+    rgba(255,255,255,0.08) 35%, rgba(0,0,0,0.06) 100%);
+}
+#underShade {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.14) 35%, rgba(0,0,0,0) 100%);
+}
+body.curling .textLayer { -webkit-user-select: none; user-select: none; }
+#viewer.zoomed { cursor: grab; }
+#viewer.zoomed:active { cursor: grabbing; }
 
 .page-container { position: relative; }
 .page-container canvas {
@@ -68,13 +92,6 @@ html, body {
   cursor: text; transform-origin: 0% 0%;
 }
 .textLayer span.markedContent { top: 0; height: 0; }
-
-#shadow {
-  position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  opacity: 0; transition: opacity 0.25s ease;
-  background: linear-gradient(90deg, rgba(0,0,0,0.4) 0%, transparent 45%);
-}
-#shadow.active { opacity: 1; }
 
 #bookmarkRibbon {
   position: absolute; top: 14px; right: 14px; z-index: 9;
@@ -150,6 +167,10 @@ html, body {
 /* ---- Reader themes (body[data-theme]) ---------------------------------- */
 .page-container canvas { transition: filter 0.35s ease; }
 #viewer { transition: background 0.35s ease; }
+
+body[data-theme="sepia"] { --paper: #F4E7CF; }
+body[data-theme="night"] { --paper: #1E1E22; }
+body[data-theme="candlelight"] { --paper: #E9C58E; }
 
 body[data-theme="sepia"] #viewer {
   background: radial-gradient(120% 120% at 50% 0%, #3A2D20 0%, #2A2118 70%);

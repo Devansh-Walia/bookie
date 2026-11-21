@@ -86,6 +86,11 @@ export const PdfHost = forwardRef<PdfHostHandle, PdfHostProps>(function PdfHost(
       allowFileAccessFromFileURLs
       allowUniversalAccessFromFileURLs
       allowingReadAccessToURL={documentDirectoryUri()}
+      // The viewer handles every drag/pinch itself (page curl, zoom, pan);
+      // keep the WebView's own scroll view from bouncing underneath it.
+      scrollEnabled={false}
+      bounces={false}
+      overScrollMode="never"
       onMessage={(event: WebViewMessageEvent) =>
         onMessage(event.nativeEvent.data)
       }

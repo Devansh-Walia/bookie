@@ -50,28 +50,43 @@ jobs:
       - name: Export the web app
         run: npx expo export -p web
 
+      # `expo export` copies public/ into dist/, so a leftover Pages artifact
+      # in public/ (index.html = the landing page) silently replaces the app
+      # shell and the site ships an empty screen. Fail instead.
+      - name: Check the export is the app, not a stale artifact
+        run: |
+          set -euo pipefail
+          if ! grep -q 'id="root"' dist/index.html; then
+            echo "::error::dist/index.html is not the Expo app shell."
+            echo "Something in public/ overwrote it (public/ is Expo's static"
+            echo "assets folder and is copied into every export)."
+            exit 1
+          fi
+
       - name: Assemble the site
         run: |
           set -euo pipefail
-          mkdir -p public/app
+          # Assemble outside public/ (Expo's static-assets folder).
+          rm -rf pages
+          mkdir -p pages/app
           # The app lives at /bookie/app/, the landing page at /bookie/.
-          cp -R dist/. public/app/
-          cp -R site/. public/
+          cp -R dist/. pages/app/
+          cp -R site/. pages/
 
           # GitHub Pages serves through Jekyll, which silently drops any
           # directory starting with "_" — that would delete _expo/ and the
           # whole app with it.
-          touch public/.nojekyll
+          touch pages/.nojekyll
 
           # SPA fallback: a deep link like /bookie/app/stats has no file on
           # disk, so Pages serves 404.html. Handing it the app shell lets
           # expo-router resolve the route client-side.
-          cp public/app/index.html public/app/404.html
+          cp pages/app/index.html pages/app/404.html
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
-        with: { path: public }
+        with: { path: pages }
 
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -1,3 +1,4 @@
+import { PAGE_CURL_SOURCE } from "./pageCurl";
 import { COMPUTE_RENDER_SCALE_SOURCE } from "./pdfRenderScale";
 import { VIEWER_CSS } from "./pdfViewerStyles";
 import { buildViewerScript } from "./pdfViewerScript";
@@ -54,9 +55,12 @@ export function escapeClosingScriptTag(source: string): string {
 /**
  * Builds the full HTML document rendered inside the PDF viewer's WebView.
  *
- * The page-turn animation uses two stacked layers (`#pageBack` /
- * `#pageFront`): the outgoing page rotates away around its spine while the
- * incoming page is already rendered flat underneath — a real 3D page flip.
+ * Page turns are a FlipHTML5-style page curl (see pageCurl.ts): the sheet
+ * being turned (`#pageFront`) is clipped along a fold line, its lifted part
+ * is mirrored over it as the back of the paper (`#flap`), and the page it
+ * uncovers (`#pageBack`) is shaded underneath. The curl follows the finger or
+ * mouse; taps, keys, the wheel and the buttons animate it. Everything sits in
+ * `#stage`, which pinch / double-tap zoom scales and pans.
  *
  * Reader features (see pdfViewerScript.ts / pdfViewerStyles.ts):
  *  - Book thickness: left/right "page stacks" grow/shrink with progress.
@@ -95,21 +99,33 @@ export function buildPdfViewerHtml({
     bookmarksLiteral,
     highlightsLiteral,
     computeRenderScaleSource: COMPUTE_RENDER_SCALE_SOURCE,
+    pageCurlSource: PAGE_CURL_SOURCE,
   });
 
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2.0, user-scalable=yes" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <style>${VIEWER_CSS}</style>
     ${preludeScript ? `<script>${escapeClosingScriptTag(preludeScript)}</script>` : ""}
   </head>
   <body data-theme="${safeTheme}">
     <div id="viewer" tabindex="0" role="region" aria-label="Book pages">
-      <div id="pageBack" class="page-layer"></div>
-      <div id="pageFront" class="page-layer"></div>
-      <div id="shadow"></div>
+      <div id="stage">
+        <div id="pageBack" class="page-layer"></div>
+        <div id="underClip" class="curl-clip"><div id="underShade" class="curl-band"></div></div>
+        <div id="pageFront" class="page-layer"></div>
+        <div id="flapClip" class="curl-clip">
+          <div id="flapCast">
+            <div id="flap" class="page-container">
+              <canvas id="flapCanvas"></canvas>
+              <div class="flap-paper"></div>
+              <div id="flapShade" class="curl-band"></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div id="bookmarkRibbon"></div>
       <div id="highlightToolbar">
         <span class="swatch" style="background:#FACC15"></span>

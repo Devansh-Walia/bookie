@@ -56,6 +56,20 @@
   the same keys when focus is on the host. `PdfHost.web.tsx` focuses the iframe
   on load so arrows work immediately. `pdfViewerKeyboard.dom.test.ts` drives the
   viewer script in jsdom (the `jest-expo/web` project in `package.json`).
+- **Page turn = FlipHTML5-style page curl:** the geometry is in
+  `components/PDF/pageCurl.ts`, a source string like `pdfRenderScale.ts` that
+  is tested in `pageCurl.test.ts`. The fold line is the perpendicular bisector
+  of grabbed point C to drag point P. `#pageFront` is clip-pathed to the flat
+  part, `#flap` mirrors the lifted part (matrix reflection), and `#pageBack`
+  holds the uncovered page. Gestures in `pdfViewerScript.ts` use Pointer
+  Events:
+  - touch drag anywhere (mouse: outer 20% edges only, so text stays
+    selectable), with follow-smoothing at 0.22 per frame
+  - release completes on direction or past the page middle, else springs back
+  - mouse corner hover peel; tap the edges to turn
+  - pinch, double-tap or Ctrl/Cmd+wheel zoom on `#stage`, with inertial pan
+  - wheel turns one page per gesture
+  - `pdfViewerGestures.dom.test.ts` covers the gestures.
 - **App Lock (Android only):** `modules/app-lock` is a local Expo module
   (classic `ModuleDefinition` API) and is autolinked from `./modules`.
   - `AppLockService` (AccessibilityService, window-state events only) opens

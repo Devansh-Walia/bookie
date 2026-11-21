@@ -28,10 +28,7 @@ import { useBookActions } from "../hooks/useBookActions";
 import type { AppColors } from "../constants/theme";
 import { radius, spacing } from "../constants/theme";
 import { useAppColors, useThemedStyles } from "../hooks/useAppTheme";
-import {
-  CONTENT_MAX_WIDTH,
-  useBreakpoint,
-} from "../hooks/useBreakpoint";
+import { CONTENT_MAX_WIDTH, useBreakpoint } from "../hooks/useBreakpoint";
 import { BookCover, ProgressBar, progressOf } from "./BookCover";
 import { BookActionsSheet } from "./BookActionsSheet";
 import { SessionToast, ToastMessage } from "./SessionToast";
@@ -181,7 +178,9 @@ export default function BookList() {
   }, [books]);
 
   const tileWidth = Math.floor(
-    (Math.min(width, CONTENT_MAX_WIDTH) - spacing.lg * 2 - GAP * (columns - 1)) /
+    (Math.min(width, CONTENT_MAX_WIDTH) -
+      spacing.lg * 2 -
+      GAP * (columns - 1)) /
       columns,
   );
 
@@ -455,52 +454,60 @@ export default function BookList() {
             </Text>
           }
           renderItem={({ item, index }) => (
-            <Pressable
-              ref={(node) => {
-                tileRefs.current[index] = node;
-              }}
-              style={({ pressed }) => [
+            // The "…" button must not sit inside the tile's Pressable: on web
+            // both render as <button>, and a <button> inside a <button> is
+            // invalid HTML (React reports it as a hydration error).
+            <View
+              style={[
                 { width: tileWidth, marginBottom: spacing.lg },
-                pressed && { opacity: 0.8 },
                 keyboardMode && index === focusIndex && styles.tileFocused,
               ]}
-              onPress={() => openBook(item)}
-              onLongPress={() => {
-                haptics.tap();
-                setActionsBook(item);
-              }}
-              onFocus={() => setFocusIndex(index)}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.title}. ${statusLine(item)}`}
-              accessibilityHint="Opens the reader"
-              tabIndex={0}
-              focusable
-              onKeyDown={
-                // Web keys are handled by the document listener above (and by
-                // Pressable for Enter/Space); native hardware keyboards need
-                // this explicit handler.
-                Platform.OS === "web"
-                  ? undefined
-                  : (event) => {
-                      const key = keyFromEvent(event);
-                      if (isActivationKey(key)) {
-                        openBook(item);
-                        return;
-                      }
-                      moveFocus(key);
-                    }
-              }
             >
-              <BookCover book={item} width={tileWidth} />
-              <Text style={styles.tileTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
+              <Pressable
+                ref={(node) => {
+                  tileRefs.current[index] = node;
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.8 }]}
+                onPress={() => openBook(item)}
+                onLongPress={() => {
+                  haptics.tap();
+                  setActionsBook(item);
+                }}
+                onFocus={() => setFocusIndex(index)}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.title}. ${statusLine(item)}`}
+                accessibilityHint="Opens the reader"
+                tabIndex={0}
+                focusable
+                onKeyDown={
+                  // Web keys are handled by the document listener above (and by
+                  // Pressable for Enter/Space); native hardware keyboards need
+                  // this explicit handler.
+                  Platform.OS === "web"
+                    ? undefined
+                    : (event) => {
+                        const key = keyFromEvent(event);
+                        if (isActivationKey(key)) {
+                          openBook(item);
+                          return;
+                        }
+                        moveFocus(key);
+                      }
+                }
+              >
+                <BookCover book={item} width={tileWidth} />
+                <Text style={styles.tileTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+              </Pressable>
               <View style={styles.tileFooter}>
                 <Text
                   style={[
                     styles.tileStatus,
                     item.finishedAt && { color: c.success },
                   ]}
+                  onPress={() => openBook(item)}
+                  accessible={false}
                 >
                   {statusLine(item)}
                 </Text>
@@ -521,7 +528,7 @@ export default function BookList() {
               {!item.finishedAt && item.currentPage > 1 ? (
                 <ProgressBar value={progressOf(item)} height={3} />
               ) : null}
-            </Pressable>
+            </View>
           )}
         />
       )}
