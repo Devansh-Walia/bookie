@@ -1,10 +1,16 @@
 #!/usr/bin/env node
-// Stamps app.json with a versionCode that always moves forward.
+// Stamps app.json with a versionCode (Android) and buildNumber (iOS) that
+// always move forward.
 //
 // Android refuses to install an APK whose versionCode is lower than (or, for
 // Play, equal to) the installed one, so every build needs a bigger number.
-// Commit count is monotonic across tags and branches, which is exactly what we
-// want: no release can ever be a downgrade of an earlier one.
+// iOS has the same rule for CFBundleVersion: a build whose build number is not
+// greater than the installed one will not update it in place. Commit count is
+// monotonic across tags and branches, which is exactly what we want: no release
+// can ever be a downgrade of an earlier one.
+//
+// Both platforms share the number, so an Android APK and an iOS IPA built from
+// the same commit are the same release.
 //
 // Usage:
 //   node scripts/set-version-code.js --tag v1.2.3   # version=1.2.3, code from git
@@ -29,6 +35,7 @@ const flag = (name) => {
 const appJson = JSON.parse(fs.readFileSync(appJsonPath, "utf8"));
 const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
 appJson.expo.android = appJson.expo.android || {};
+appJson.expo.ios = appJson.expo.ios || {};
 
 // --- version string -------------------------------------------------------
 const tag = flag("--tag");
@@ -71,13 +78,22 @@ if (explicit !== null) {
   versionCode = commits > 0 ? Math.max(commits, current) : current + 1;
 }
 
-if (versionCode === Number(appJson.expo.android.versionCode) && !version) {
+// --- buildNumber (iOS) ----------------------------------------------------
+// Same number as versionCode: one monotonic counter for both stores.
+const buildNumber = String(versionCode);
+
+if (
+  versionCode === Number(appJson.expo.android.versionCode) &&
+  buildNumber === appJson.expo.ios.buildNumber &&
+  !version
+) {
   console.log(`versionCode already ${versionCode}, nothing to do`);
   process.exit(0);
 }
 
 // --- write ----------------------------------------------------------------
 appJson.expo.android.versionCode = versionCode;
+appJson.expo.ios.buildNumber = buildNumber;
 if (version) {
   appJson.expo.version = version;
   pkgJson.version = version;
@@ -86,5 +102,5 @@ if (version) {
 fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + "\n");
 
 console.log(
-  `versionCode=${versionCode}${version ? ` version=${version}` : ` version=${appJson.expo.version}`}`,
+  `versionCode=${versionCode} buildNumber=${buildNumber}${version ? ` version=${version}` : ` version=${appJson.expo.version}`}`,
 );

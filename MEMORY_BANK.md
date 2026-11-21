@@ -9,6 +9,15 @@
 - **Native folders are generated (CNG):** `android/` and `ios/` are gitignored;
   `app.json` is the source of truth. `npx expo run:android` regenerates them.
 - **Package manager:** npm (`package-lock.json`). Don't mix in pnpm.
+- **Releases:** `scripts/set-version-code.js` stamps `android.versionCode` and
+  `ios.buildNumber` from the git commit count (one monotonic counter for both),
+  so every build installs *over* the previous one instead of needing an
+  uninstall. CI writes `app.json`; the stamped values are never committed.
+  `release.yml` publishes on a `v*` tag (Android APK, plus an unsigned iOS IPA
+  when `build_ios` is set on a manual run). The shipped APKs are **debug-signed**
+  (`signing: debug`) since v1.2.1, so a release-signed APK will *not* update an
+  existing install — keep passing `signing: debug` unless you intend a clean
+  install.
 - **Files:** `utils/files.ts` uses the new `expo-file-system` `File`/`Directory`
   API. Books are stored by **file name** (`book.fileName`) in `Documents/books/`,
   and covers in `Documents/covers/`. Paths are resolved at runtime because the

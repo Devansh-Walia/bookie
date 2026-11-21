@@ -85,6 +85,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - name: Stamp buildNumber
+        run: node scripts/set-version-code.js --from-git
       - run: npx expo prebuild --platform ios
       - name: Build unsigned app
         working-directory: ios

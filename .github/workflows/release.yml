@@ -85,6 +85,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - name: Stamp buildNumber
+        run: |
+          if [ -n "${{ inputs.tag }}" ] || [ "${{ github.ref_type }}" = "tag" ]; then
+            node scripts/set-version-code.js --tag "$RELEASE_TAG"
+          else
+            node scripts/set-version-code.js --from-git
+          fi
       - run: npx expo prebuild --platform ios
       - name: Build unsigned app
         working-directory: ios
