@@ -63,7 +63,6 @@ export function escapeClosingScriptTag(source: string): string {
  * `#stage`, which pinch / double-tap zoom scales and pans.
  *
  * Reader features (see pdfViewerScript.ts / pdfViewerStyles.ts):
- *  - Book thickness: left/right "page stacks" grow/shrink with progress.
  *  - Text selection & highlighting via a transparent PDF.js text layer.
  *  - Bookmark ribbon indicator.
  *  - Keyboard page turns (arrows, PageUp/PageDown, Space, Home/End) plus

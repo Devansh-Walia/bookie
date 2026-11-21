@@ -143,7 +143,7 @@ The cheapest correct approach: reuse the existing viewer HTML verbatim.
     exactly.
 
 This reuses all of `pdfViewerScript.ts` (15 KB): page-flip animation, text
-selection, highlights, bookmarks, themes, book thickness. No rewrite.
+selection, highlights, bookmarks, themes. No rewrite.
 
 ## Phase 4 — covers
 

@@ -22,13 +22,16 @@ html, body {
   position: relative; height: 100%; width: 100%; overflow: hidden;
   touch-action: none;
   background: radial-gradient(120% 120% at 50% 0%, #16202F 0%, #0F172A 70%);
-  --stack-left-w: 0px; --stack-right-w: 0px;
+  /* Room around the page; the viewer script sets these per viewport size
+     (see pageInset() in pdfViewerScript.ts). */
+  --page-inset-x: 44px; --page-inset-top: 28px; --page-inset-bottom: 92px;
 }
 /* ---- Page curl (see pageCurl.ts) ---------------------------------------- */
 #stage { position: absolute; inset: 0; transform-origin: 0 0; }
 .page-layer {
   position: absolute; inset: 0; display: flex; align-items: center;
-  justify-content: center; padding: 28px 44px 92px; /* = PAGE_INSET */
+  justify-content: center;
+  padding: var(--page-inset-top) var(--page-inset-x) var(--page-inset-bottom);
 }
 #pageBack { z-index: 1; }
 #underClip { z-index: 2; }
@@ -65,18 +68,8 @@ body.curling .textLayer { -webkit-user-select: none; user-select: none; }
   display: block; border-radius: 6px; background: #fff;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
 }
-.book-stack {
-  position: absolute; top: 3%; bottom: 3%; width: 0; z-index: 0;
-  border-radius: 3px; pointer-events: none;
-  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-  background-color: #cbd5e1;
-  background-image: repeating-linear-gradient(180deg,
-    rgba(255,255,255,0.85) 0px, rgba(255,255,255,0.85) 1px,
-    rgba(100,116,139,0.5) 1px, rgba(100,116,139,0.5) 2px);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
-}
-.stack-left { left: 0; transform: translateX(-100%); width: var(--stack-left-w); }
-.stack-right { right: 0; transform: translateX(100%); width: var(--stack-right-w); }
+/* Phones: the page runs edge to edge, no card chrome around it. */
+#viewer.compact .page-container canvas { border-radius: 0; box-shadow: none; }
 
 .hl-layer { position: absolute; inset: 0; z-index: 2; }
 .hl-rect { position: absolute; border-radius: 2px; mix-blend-mode: multiply; }
@@ -186,7 +179,6 @@ body[data-theme="night"] .page-container canvas {
   filter: invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(0.9);
 }
 body[data-theme="night"] .hl-rect { mix-blend-mode: screen; opacity: 0.55; }
-body[data-theme="night"] .book-stack { filter: brightness(0.35); }
 
 body[data-theme="candlelight"] #viewer {
   background: radial-gradient(110% 90% at 50% 40%, #3B2410 0%, #1A0F06 75%);
@@ -199,5 +191,4 @@ body[data-theme="candlelight"] .page-container::after {
   border-radius: 6px;
   background: radial-gradient(90% 70% at 50% 45%, rgba(255, 170, 80, 0.06) 0%, rgba(40, 18, 0, 0.32) 100%);
 }
-body[data-theme="candlelight"] .book-stack { filter: sepia(0.8) brightness(0.6); }
 `;

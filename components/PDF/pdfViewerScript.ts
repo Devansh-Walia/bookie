@@ -62,9 +62,12 @@ export function buildViewerScript({
   var CURL_LIFT = 0.05;
   var FOLLOW = 0.22;
   var MAX_ZOOM = 4;
-  // Room around the page: sides fit the page stacks (up to 26px), the bottom
-  // keeps the page clear of the floating controls.
-  var PAGE_INSET = { x: 44, top: 28, bottom: 92 };
+  // Room around the page. Phones get the whole screen (the page runs edge to
+  // edge); wider viewports keep a margin so the floating controls and the
+  // page edge stay apart. Mirrored into CSS by applyPageInset().
+  var COMPACT_MAX_WIDTH = 700;
+  var PAGE_INSET_WIDE = { x: 44, top: 28, bottom: 92 };
+  var PAGE_INSET_COMPACT = { x: 0, top: 0, bottom: 0 };
   var MAX_CACHE = 6;
   var pageCache = new Map();
 
@@ -140,15 +143,32 @@ export function buildViewerScript({
     });
   }
 
+  // The inset for the current viewport, mirrored into CSS so .page-layer's
+  // padding matches the fit maths below.
+  function pageInset() {
+    var w = viewerEl.clientWidth || 0;
+    return w > 0 && w <= COMPACT_MAX_WIDTH ? PAGE_INSET_COMPACT : PAGE_INSET_WIDE;
+  }
+
+  function applyPageInset() {
+    var inset = pageInset();
+    viewerEl.style.setProperty("--page-inset-x", inset.x + "px");
+    viewerEl.style.setProperty("--page-inset-top", inset.top + "px");
+    viewerEl.style.setProperty("--page-inset-bottom", inset.bottom + "px");
+    viewerEl.classList.toggle("compact", inset === PAGE_INSET_COMPACT);
+    return inset;
+  }
+
   function renderPage(num) {
     var cached = cacheGet(num);
     if (cached) return Promise.resolve(cached);
     return pdfDoc.getPage(num).then(function (page) {
       var baseViewport = page.getViewport({ scale: 1 });
-      // Fit the page inside a margin (PAGE_INSET, matching .page-layer's
-      // padding) so the page-stack edges and the controls stay clear of it.
-      var cw = Math.max(80, (viewerEl.clientWidth || baseViewport.width) - PAGE_INSET.x * 2);
-      var ch = Math.max(80, (viewerEl.clientHeight || baseViewport.height) - PAGE_INSET.top - PAGE_INSET.bottom);
+      // Fit the page inside the viewport minus the inset, so on a phone the
+      // page fills the screen and on wider screens it keeps its margin.
+      var inset = pageInset();
+      var cw = Math.max(80, (viewerEl.clientWidth || baseViewport.width) - inset.x * 2);
+      var ch = Math.max(80, (viewerEl.clientHeight || baseViewport.height) - inset.top - inset.bottom);
       var fitScale = Math.min(cw / baseViewport.width, ch / baseViewport.height);
       var renderScale = computeRenderScale({
         pageWidthPt: baseViewport.width,
@@ -172,13 +192,6 @@ export function buildViewerScript({
       canvas.style.width = cssWidth + "px";
       canvas.style.height = cssHeight + "px";
       container.appendChild(canvas);
-
-      var leftStack = document.createElement("div");
-      leftStack.className = "book-stack stack-left";
-      container.appendChild(leftStack);
-      var rightStack = document.createElement("div");
-      rightStack.className = "book-stack stack-right";
-      container.appendChild(rightStack);
 
       var hlLayer = document.createElement("div");
       hlLayer.className = "hl-layer";
@@ -208,15 +221,6 @@ export function buildViewerScript({
     pageInfoEl.textContent = "Page " + num + " / " + pdfDoc.numPages;
   }
 
-  function updateBookThickness() {
-    var total = pdfDoc ? pdfDoc.numPages : 1;
-    var read = Math.max(0, currentPage - 1);
-    var remaining = Math.max(0, total - currentPage);
-    var maxW = 26;
-    viewerEl.style.setProperty("--stack-left-w", Math.round((read / total) * maxW) + "px");
-    viewerEl.style.setProperty("--stack-right-w", Math.round((remaining / total) * maxW) + "px");
-  }
-
   function updateBookmarkRibbon() {
     var bm = null;
     for (var i = 0; i < bookmarks.length; i++) {
@@ -231,7 +235,6 @@ export function buildViewerScript({
   }
 
   function afterPageChange() {
-    updateBookThickness();
     updateBookmarkRibbon();
   }
 
@@ -1234,6 +1237,28 @@ export function buildViewerScript({
 
   retryBtn.onclick = function () { loadPdfDocument(); };
 
+  // Re-fit the page when the viewport changes (rotation, window resize).
+  var lastViewport = { w: 0, h: 0 };
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      resizeTimer = null;
+      var w = viewerEl.clientWidth;
+      var h = viewerEl.clientHeight;
+      if (!w || !h || (w === lastViewport.w && h === lastViewport.h)) return;
+      lastViewport = { w: w, h: h };
+      applyPageInset();
+      if (!pdfDoc || curl) return;
+      snapCurl();
+      resetZoom(false);
+      pageCache.clear();
+      showPage(currentPage).catch(function () {});
+    }, 250);
+  });
+
+  lastViewport = { w: viewerEl.clientWidth, h: viewerEl.clientHeight };
+  applyPageInset();
   loadPdfDocument();
 })();`;
 }
