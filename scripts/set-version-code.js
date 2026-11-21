@@ -34,6 +34,20 @@ const flag = (name) => {
 
 const appJson = JSON.parse(fs.readFileSync(appJsonPath, "utf8"));
 const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
+
+function isShallow() {
+  try {
+    return (
+      execFileSync("git", ["rev-parse", "--is-shallow-repository"], {
+        cwd: root,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim() === "true"
+    );
+  } catch {
+    return false;
+  }
+}
 appJson.expo.android = appJson.expo.android || {};
 appJson.expo.ios = appJson.expo.ios || {};
 
@@ -71,6 +85,17 @@ if (explicit !== null) {
     );
   } catch {
     // No git (e.g. a tarball checkout): fall back to bumping what is there.
+  }
+
+  // A shallow clone (actions/checkout defaults to depth 1) counts 1 commit, so
+  // the number below would silently not move forward and the build would refuse
+  // to install over the previous one. Fail loudly instead.
+  if (commits > 0 && isShallow()) {
+    console.error(
+      "set-version-code: shallow git clone, so the commit count is meaningless.\n" +
+        "Set `fetch-depth: 0` on actions/checkout, or pass --code explicitly.",
+    );
+    process.exit(1);
   }
   const current = Number(appJson.expo.android.versionCode) || 0;
   // Commit count is the source of truth. Only bump past it when there is no git
