@@ -10,7 +10,7 @@ on:
         type: string
         required: true
       build_ios:
-        description: 'Also build unsigned iOS IPA (experimental)'
+        description: 'Also build unsigned iOS IPA (tag pushes always do)'
         type: boolean
         default: false
       signing:
@@ -78,7 +78,10 @@ jobs:
         with: { name: android, path: Bookie-*.apk }
 
   ios:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ios }}
+    # Tag pushes build iOS too: a release should ship both platforms, and a
+    # tag push is the only trigger that works for maintainers without admin
+    # rights (workflow_dispatch needs admin). Manual runs still opt in.
+    if: ${{ github.event_name == 'push' || inputs.build_ios }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,8 +112,10 @@ jobs:
         with: { name: ios, path: Bookie-*.ipa }
 
   release:
+    # Publish whatever built. The iOS IPA is unsigned and experimental, so an
+    # iOS failure must not cost us the Android APK — it still turns the run red.
     needs: [android, ios]
-    if: ${{ !cancelled() && needs.android.result == 'success' && (needs.ios.result == 'success' || needs.ios.result == 'skipped') }}
+    if: ${{ !cancelled() && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
