@@ -11,7 +11,7 @@
     "postinstall": "node ./scripts/copy-pdfjs-assets.js",
     "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit",
-    "build:web": "expo export -p web"
+    "build:web": "BOOKIE_BASE_URL=/bookie/app expo export -p web"
   },
   "jest": {
     "projects": [

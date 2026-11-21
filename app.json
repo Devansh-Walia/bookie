@@ -48,8 +48,7 @@
       "expo-sharing"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "baseUrl": "/bookie/app"
+      "typedRoutes": true
     },
     "extra": {
       "eas": {

@@ -48,6 +48,10 @@ jobs:
       - run: npm test -- --ci
 
       - name: Export the web app
+        env:
+          # baseUrl is web-only (see app.config.js): it is what puts the app at
+          # /bookie/app/ on Pages, and it must not leak into native builds.
+          BOOKIE_BASE_URL: /bookie/app
         run: npx expo export -p web
 
       # `expo export` copies public/ into dist/, so a leftover Pages artifact
